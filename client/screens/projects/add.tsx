@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Modal } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useSafeRouter } from '@/hooks/useSafeRouter';
+import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { ProjectStorage } from '@/utils/storage';
 import { generateUUID, normalizeDateString } from '@/utils/helpers';
 import { saveImageLocally, deleteLocalImage } from '@/utils/imageStorage';
@@ -82,9 +82,10 @@ export default function AddProjectScreen() {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useSafeRouter();
+  const params = useSafeSearchParams<{ projectType?: 'contract' | 'delivery' }>();
 
   const [name, setName] = useState('');
-  const [projectType, setProjectType] = useState<ProjectType>('contract');
+  const [projectType, setProjectType] = useState<ProjectType>((params.projectType as ProjectType) || 'contract');
   const [description, setDescription] = useState('');
   const [manager, setManager] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -177,6 +178,20 @@ export default function AddProjectScreen() {
     setPreviewImage(uri);
     setPreviewVisible(true);
   }, []);
+
+  // 处理状态变更，已完成状态需要验证收款金额
+  const handleStatusChange = useCallback((newStatus: ProjectStatus) => {
+    if (newStatus === 'completed' && projectType === 'contract') {
+      // 工程项目：检查已收款金额是否等于合同金额
+      const contract = parseFloat(contractAmount) || 0;
+      const received = parseFloat(receivedAmount) || 0;
+      if (contract > 0 && received < contract) {
+        alert(`无法标记为已完成：收款金额（¥${received.toLocaleString()}）未达到合同金额（¥${contract.toLocaleString()}）`);
+        return;
+      }
+    }
+    setStatus(newStatus);
+  }, [projectType, contractAmount, receivedAmount]);
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
@@ -315,12 +330,12 @@ export default function AddProjectScreen() {
               </ThemedText>
               <View style={styles.statusContainer}>
                 {(Object.keys(ProjectStatusNames) as ProjectStatus[]).map((key) => (
-                  <StatusOption 
-                    key={key} 
-                    value={key} 
-                    label={ProjectStatusNames[key]} 
+                  <StatusOption
+                    key={key}
+                    value={key}
+                    label={ProjectStatusNames[key]}
                     status={status}
-                    onPress={setStatus}
+                    onPress={handleStatusChange}
                   />
                 ))}
               </View>

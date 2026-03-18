@@ -214,6 +214,20 @@ export default function EditProjectScreen() {
     setPreviewVisible(true);
   }, []);
 
+  // 处理状态变更，已完成状态需要验证收款金额
+  const handleStatusChange = useCallback((newStatus: ProjectStatus) => {
+    if (newStatus === 'completed' && projectType === 'contract') {
+      // 工程项目：检查已收款金额是否等于合同金额
+      const contract = parseFloat(contractAmount) || 0;
+      const received = parseFloat(receivedAmount) || 0;
+      if (contract > 0 && received < contract) {
+        alert(`无法标记为已完成：收款金额（¥${received.toLocaleString()}）未达到合同金额（¥${contract.toLocaleString()}）`);
+        return;
+      }
+    }
+    setStatus(newStatus);
+  }, [projectType, contractAmount, receivedAmount]);
+
   const handleSave = useCallback(async () => {
     if (!project) return;
 
@@ -394,12 +408,12 @@ export default function EditProjectScreen() {
               </ThemedText>
               <View style={styles.statusContainer}>
                 {(Object.keys(ProjectStatusNames) as ProjectStatus[]).map((key) => (
-                  <StatusOption 
-                    key={key} 
-                    value={key} 
-                    label={ProjectStatusNames[key]} 
+                  <StatusOption
+                    key={key}
+                    value={key}
+                    label={ProjectStatusNames[key]}
                     status={status}
-                    onPress={setStatus}
+                    onPress={handleStatusChange}
                   />
                 ))}
               </View>

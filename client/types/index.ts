@@ -162,6 +162,32 @@ export interface ProjectStats {
 }
 
 /**
+ * 零星采购收款记录数据模型
+ */
+export interface DeliveryPaymentRecord {
+  id: string;
+  projectId: string;
+  projectName: string;
+  amount: number;
+  description?: string;
+  date: string; // 收款日期
+  createdAt: string;
+}
+
+/**
+ * 零星采购开票记录数据模型
+ */
+export interface DeliveryInvoiceRecord {
+  id: string;
+  projectId: string;
+  projectName: string;
+  amount: number;
+  description?: string;
+  date: string; // 开票日期
+  createdAt: string;
+}
+
+/**
  * 导出数据格式
  */
 export interface ExportData {
@@ -173,4 +199,6 @@ export interface ExportData {
   paymentRecords?: PaymentRecord[];
   invoiceRecords?: InvoiceRecord[];
   deliveryRecords?: DeliveryRecord[];
+  deliveryPaymentRecords?: DeliveryPaymentRecord[];
+  deliveryInvoiceRecords?: DeliveryInvoiceRecord[];
 }

@@ -560,69 +560,6 @@ export default function StatsScreen() {
             </ThemedView>
           )}
 
-          {/* 零星采购开票收款记录 */}
-          {!selectedProjectId && deliveryProjects.length > 0 && (
-            <ThemedView level="default" style={styles.sectionCard}>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textSecondary, marginBottom: 12 }}>
-                零星采购开票收款记录
-              </Text>
-
-              <TouchableOpacity
-                style={[styles.projectSelector, { backgroundColor: theme.backgroundTertiary }]}
-                onPress={() => setDeliveryRecordSelectorVisible(true)}
-              >
-                <Text style={{ color: deliveryRecordProjectId ? theme.textPrimary : theme.textMuted }}>
-                  {deliveryRecordProjectId
-                    ? projects.find(p => p.id === deliveryRecordProjectId)?.name || '选择项目'
-                    : '全部零星采购'
-                  }
-                </Text>
-                <FontAwesome6 name="chevron-down" size={16} color={theme.textMuted} />
-              </TouchableOpacity>
-
-              {deliveryInvoicePaymentSummary.length > 0 ? (
-                deliveryInvoicePaymentSummary.map((item, index) => (
-                  <View key={item.projectId} style={[styles.summaryCard, { borderBottomWidth: index === deliveryInvoicePaymentSummary.length - 1 ? 0 : 1, borderBottomColor: theme.borderLight }]}>
-                    <View style={styles.summaryCardHeader}>
-                      <View style={[styles.typeBadgeSmall, { backgroundColor: '#E53935' }]}>
-                        <Text style={{ fontSize: 10, color: '#fff' }}>送</Text>
-                      </View>
-                      <Text style={{ flex: 1, fontWeight: '600', color: theme.textPrimary, marginLeft: 8 }}>
-                        {item.projectName}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: theme.textMuted }}>
-                        {item.recordCount} 条记录
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.summaryCardStats}>
-                      <View style={styles.summaryCardStatItem}>
-                        <Text style={{ fontSize: 12, color: theme.textMuted }}>送货总额</Text>
-                        <Text style={{ color: theme.accent }}>{formatCurrency(item.totalAmount)}</Text>
-                      </View>
-                      <View style={styles.summaryCardStatItem}>
-                        <Text style={{ fontSize: 12, color: theme.textMuted }}>已开票</Text>
-                        <Text style={{ color: theme.primary }}>{formatCurrency(item.invoiceAmount)}</Text>
-                      </View>
-                      <View style={styles.summaryCardStatItem}>
-                        <Text style={{ fontSize: 12, color: theme.textMuted }}>已收款</Text>
-                        <Text style={{ color: theme.success }}>{formatCurrency(item.receivedAmount)}</Text>
-                      </View>
-                      <View style={styles.summaryCardStatItem}>
-                        <Text style={{ fontSize: 12, color: theme.textMuted }}>未收款</Text>
-                        <Text style={{ color: theme.error }}>{formatCurrency(item.totalAmount - item.receivedAmount)}</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={{ paddingVertical: 16, textAlign: 'center', color: theme.textMuted }}>
-                  暂无开票收款记录
-                </Text>
-              )}
-            </ThemedView>
-          )}
-
           <View style={{ height: 100 }} />
         </ScrollView>
 

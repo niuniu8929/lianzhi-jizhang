@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Project, Transaction, ExportData, ExpenseCategory, PaymentRecord, InvoiceRecord, DeliveryRecord } from '@/types';
+import { Project, Transaction, ExportData, ExpenseCategory, PaymentRecord, InvoiceRecord, DeliveryRecord, DeliveryPaymentRecord, DeliveryInvoiceRecord } from '@/types';
 
 const PROJECTS_KEY = '@project_accounting_projects';
 const TRANSACTIONS_KEY = '@project_accounting_transactions';
@@ -7,6 +7,8 @@ const EXPENSE_CATEGORIES_KEY = '@project_accounting_expense_categories';
 const PAYMENT_RECORDS_KEY = '@project_accounting_payment_records';
 const INVOICE_RECORDS_KEY = '@project_accounting_invoice_records';
 const DELIVERY_RECORDS_KEY = '@project_accounting_delivery_records';
+const DELIVERY_PAYMENT_RECORDS_KEY = '@project_accounting_delivery_payment_records';
+const DELIVERY_INVOICE_RECORDS_KEY = '@project_accounting_delivery_invoice_records';
 
 /**
  * 项目数据存储工具
@@ -686,6 +688,159 @@ export const DeliveryRecordStorage = {
       return true;
     } catch (error) {
       console.error('清空送货记录失败:', error);
+      return false;
+    }
+  },
+};
+
+
+/**
+ * 零星采购收款记录数据存储工具
+ */
+export const DeliveryPaymentRecordStorage = {
+  async getAll(): Promise<DeliveryPaymentRecord[]> {
+    try {
+      const data = await AsyncStorage.getItem(DELIVERY_PAYMENT_RECORDS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('获取零星采购收款记录失败:', error);
+      return [];
+    }
+  },
+
+  async getByProjectId(projectId: string): Promise<DeliveryPaymentRecord[]> {
+    try {
+      const records = await this.getAll();
+      return records.filter(r => r.projectId === projectId);
+    } catch (error) {
+      console.error('获取项目零星采购收款记录失败:', error);
+      return [];
+    }
+  },
+
+  async save(record: DeliveryPaymentRecord): Promise<boolean> {
+    try {
+      const records = await this.getAll();
+      const index = records.findIndex(r => r.id === record.id);
+      if (index >= 0) {
+        records[index] = record;
+      } else {
+        records.push(record);
+      }
+      await AsyncStorage.setItem(DELIVERY_PAYMENT_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('保存零星采购收款记录失败:', error);
+      return false;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      let records = await this.getAll();
+      records = records.filter(r => r.id !== id);
+      await AsyncStorage.setItem(DELIVERY_PAYMENT_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('删除零星采购收款记录失败:', error);
+      return false;
+    }
+  },
+
+  async deleteByProjectId(projectId: string): Promise<boolean> {
+    try {
+      let records = await this.getAll();
+      records = records.filter(r => r.projectId !== projectId);
+      await AsyncStorage.setItem(DELIVERY_PAYMENT_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('删除项目零星采购收款记录失败:', error);
+      return false;
+    }
+  },
+
+  async clear(): Promise<boolean> {
+    try {
+      await AsyncStorage.removeItem(DELIVERY_PAYMENT_RECORDS_KEY);
+      return true;
+    } catch (error) {
+      console.error('清空零星采购收款记录失败:', error);
+      return false;
+    }
+  },
+};
+
+/**
+ * 零星采购开票记录数据存储工具
+ */
+export const DeliveryInvoiceRecordStorage = {
+  async getAll(): Promise<DeliveryInvoiceRecord[]> {
+    try {
+      const data = await AsyncStorage.getItem(DELIVERY_INVOICE_RECORDS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('获取零星采购开票记录失败:', error);
+      return [];
+    }
+  },
+
+  async getByProjectId(projectId: string): Promise<DeliveryInvoiceRecord[]> {
+    try {
+      const records = await this.getAll();
+      return records.filter(r => r.projectId === projectId);
+    } catch (error) {
+      console.error('获取项目零星采购开票记录失败:', error);
+      return [];
+    }
+  },
+
+  async save(record: DeliveryInvoiceRecord): Promise<boolean> {
+    try {
+      const records = await this.getAll();
+      const index = records.findIndex(r => r.id === record.id);
+      if (index >= 0) {
+        records[index] = record;
+      } else {
+        records.push(record);
+      }
+      await AsyncStorage.setItem(DELIVERY_INVOICE_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('保存零星采购开票记录失败:', error);
+      return false;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      let records = await this.getAll();
+      records = records.filter(r => r.id !== id);
+      await AsyncStorage.setItem(DELIVERY_INVOICE_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('删除零星采购开票记录失败:', error);
+      return false;
+    }
+  },
+
+  async deleteByProjectId(projectId: string): Promise<boolean> {
+    try {
+      let records = await this.getAll();
+      records = records.filter(r => r.projectId !== projectId);
+      await AsyncStorage.setItem(DELIVERY_INVOICE_RECORDS_KEY, JSON.stringify(records));
+      return true;
+    } catch (error) {
+      console.error('删除项目零星采购开票记录失败:', error);
+      return false;
+    }
+  },
+
+  async clear(): Promise<boolean> {
+    try {
+      await AsyncStorage.removeItem(DELIVERY_INVOICE_RECORDS_KEY);
+      return true;
+    } catch (error) {
+      console.error('清空零星采购开票记录失败:', error);
       return false;
     }
   },

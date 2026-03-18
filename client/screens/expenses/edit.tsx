@@ -5,7 +5,7 @@ import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { Transaction, Project, ExpenseCategory } from '@/types';
 import { TransactionStorage, ProjectStorage, ExpenseCategoryStorage } from '@/utils/storage';
 import { formatDate } from '@/utils/helpers';
-import { createFormDataFile } from '@/utils';
+import { saveImagesLocally } from '@/utils/imageStorage';
 import { Screen } from '@/components/Screen';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -300,7 +300,7 @@ export default function EditExpenseScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]); // 移除 router 依赖，避免无限循环
+  }, [id]);
 
   // 拍照
   const handleTakePhoto = useCallback(async () => {
@@ -353,36 +353,6 @@ export default function EditExpenseScreen() {
     setExistingImages(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // 上传图片到服务器
-  const uploadImages = useCallback(async (localUris: string[]): Promise<string[]> => {
-    const uploadedUrls: string[] = [];
-    const baseUrl = process.env.EXPO_PUBLIC_BACKEND_BASE_URL;
-
-    for (const uri of localUris) {
-      try {
-        const fileName = `expense_${Date.now()}.jpg`;
-        const file = await createFormDataFile(uri, fileName, 'image/jpeg');
-
-        const formData = new FormData();
-        formData.append('file', file as any);
-
-        const response = await fetch(`${baseUrl}/api/v1/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (data.success && data.url) {
-          uploadedUrls.push(data.url);
-        }
-      } catch (error) {
-        console.error('上传图片失败:', error);
-      }
-    }
-
-    return uploadedUrls;
-  }, []);
-
   const handleSave = async () => {
     if (!transaction || !selectedProjectId) {
       Alert.alert('错误', '数据不完整');
@@ -402,14 +372,14 @@ export default function EditExpenseScreen() {
 
     setUploading(true);
     try {
-      // 上传新图片
-      let uploadedImageUrls: string[] = [];
+      // 保存新图片到本地（不再上传服务器）
+      let savedImageUris: string[] = [];
       if (images.length > 0) {
-        uploadedImageUrls = await uploadImages(images);
+        savedImageUris = await saveImagesLocally(images);
       }
 
-      // 合并已存在的图片和新上传的图片
-      const allImages = [...existingImages, ...uploadedImageUrls];
+      // 合并已存在的图片和新保存的图片
+      const allImages = [...existingImages, ...savedImageUris];
 
       const updatedTransaction: Transaction = {
         ...transaction,
@@ -918,12 +888,12 @@ export default function EditExpenseScreen() {
                     {item.id === null ? (
                       <FontAwesome6 name="tag" size={18} color={selectedCategoryId === null ? theme.primary : theme.textSecondary} />
                     ) : (
-                      <View style={{ width: 10, height: 10, borderRadius: 5, marginRight: 0, backgroundColor: item.color }} />
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color }} />
                     )}
                     <ThemedText variant="body" color={theme.textPrimary} style={{ marginLeft: Spacing.md, flex: 1 }}>
                       {item.name}
                     </ThemedText>
-                    {selectedCategoryId === item.id && (
+                    {(selectedCategoryId === item.id || (selectedCategoryId === null && item.id === null)) && (
                       <FontAwesome6 name="check" size={18} color={item.id === null ? theme.primary : item.color} />
                     )}
                   </TouchableOpacity>
@@ -945,7 +915,7 @@ export default function EditExpenseScreen() {
               style={styles.imageViewerClose}
               onPress={() => setImageViewerVisible(false)}
             >
-              <FontAwesome6 name="xmark" size={28} color="#FFFFFF" />
+              <FontAwesome6 name="xmark" size={28} color="#fff" />
             </TouchableOpacity>
             <Image
               source={{ uri: currentImageUri }}

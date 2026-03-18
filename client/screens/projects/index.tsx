@@ -156,6 +156,7 @@ export default function ProjectsScreen() {
   // 图片预览状态
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [addProjectModalVisible, setAddProjectModalVisible] = useState(false);
 
   // 查看图片
   const handleViewImage = useCallback((imageUrl: string) => {
@@ -240,13 +241,28 @@ export default function ProjectsScreen() {
   }, [projects]);
 
   const handleAddProject = () => {
-    router.push('/projects/add');
+    setAddProjectModalVisible(true);
+  };
+
+  const handleSelectProjectType = (type: 'contract' | 'delivery') => {
+    setAddProjectModalVisible(false);
+    if (type === 'contract') {
+      // 工程项目：跳转到新增项目页面
+      router.push('/projects/add', { projectType: type });
+    } else {
+      // 零星采购：直接跳转到添加送货记录页面（会自动创建项目）
+      router.push('/delivery-add');
+    }
   };
 
   const handleEditProject = (project: Project) => {
     console.log('编辑项目被点击:', project.id, project.name);
-    console.log('准备跳转到编辑页面，参数 id:', project.id);
-    router.push('/projects/edit', { id: project.id });
+    // 零星采购项目跳转到详情页面，工程项目跳转到编辑页面
+    if (project.projectType === 'delivery') {
+      router.push('/projects/detail', { id: project.id });
+    } else {
+      router.push('/projects/edit', { id: project.id });
+    }
     console.log('路由跳转已调用');
   };
 
@@ -552,12 +568,130 @@ export default function ProjectsScreen() {
           >
             <FontAwesome6 name="xmark" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Image 
-            source={{ uri: previewImageUrl }} 
+          <Image
+            source={{ uri: previewImageUrl }}
             style={{ width: '100%', height: '80%' }}
             resizeMode="contain"
           />
         </View>
+      </Modal>
+
+      {/* 新增项目选择Modal */}
+      <Modal
+        visible={addProjectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddProjectModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          activeOpacity={1}
+          onPress={() => setAddProjectModalVisible(false)}
+        >
+          <View
+            style={{
+              backgroundColor: theme.backgroundDefault,
+              borderRadius: BorderRadius.xl,
+              padding: Spacing.xl,
+              width: '80%',
+              maxWidth: 320,
+            }}
+          >
+            <ThemedText variant="h4" color={theme.textPrimary} style={{ textAlign: 'center', marginBottom: Spacing.lg }}>
+              选择项目类型
+            </ThemedText>
+
+            {/* 工程项目选项 */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: Spacing.lg,
+                backgroundColor: theme.primary + '10',
+                borderRadius: BorderRadius.lg,
+                marginBottom: Spacing.md,
+                borderWidth: 2,
+                borderColor: theme.primary,
+              }}
+              onPress={() => handleSelectProjectType('contract')}
+            >
+              <View style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: theme.primary,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: Spacing.md,
+              }}>
+                <FontAwesome6 name="building" size={24} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText variant="body" color={theme.textPrimary} style={{ fontWeight: '600' }}>
+                  工程项目
+                </ThemedText>
+                <ThemedText variant="caption" color={theme.textMuted}>
+                  合同金额、收款、开票管理
+                </ThemedText>
+              </View>
+              <FontAwesome6 name="chevron-right" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            {/* 零星采购选项 */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: Spacing.lg,
+                backgroundColor: theme.accent + '10',
+                borderRadius: BorderRadius.lg,
+                borderWidth: 2,
+                borderColor: theme.accent,
+              }}
+              onPress={() => handleSelectProjectType('delivery')}
+            >
+              <View style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: theme.accent,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: Spacing.md,
+              }}>
+                <FontAwesome6 name="truck" size={24} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText variant="body" color={theme.textPrimary} style={{ fontWeight: '600' }}>
+                  零星采购
+                </ThemedText>
+                <ThemedText variant="caption" color={theme.textMuted}>
+                  直接添加送货记录
+                </ThemedText>
+              </View>
+              <FontAwesome6 name="chevron-right" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            {/* 取消按钮 */}
+            <TouchableOpacity
+              style={{
+                marginTop: Spacing.lg,
+                paddingVertical: Spacing.md,
+                alignItems: 'center',
+              }}
+              onPress={() => setAddProjectModalVisible(false)}
+            >
+              <ThemedText variant="body" color={theme.textMuted}>
+                取消
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </Screen>
   );

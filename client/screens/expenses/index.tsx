@@ -125,6 +125,8 @@ export default function ExpensesScreen() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [showProjectFilter, setShowProjectFilter] = useState(false);
+  const [filterUnpaid, setFilterUnpaid] = useState<boolean | null>(null);
+  const [filterUninvoiced, setFilterUninvoiced] = useState<boolean | null>(null);
 
   const loadData = useCallback(async () => {
     const [txData, projData, catData] = await Promise.all([
@@ -147,15 +149,29 @@ export default function ExpensesScreen() {
     return transactions.filter((tx) => {
       if (selectedCategory && tx.categoryId !== selectedCategory) return false;
       if (selectedProject && tx.projectId !== selectedProject) return false;
+      if (filterUnpaid !== null && tx.isPaid === filterUnpaid) return false;
+      if (filterUninvoiced !== null && tx.isInvoiced === filterUninvoiced) return false;
       return true;
     });
-  }, [transactions, selectedCategory, selectedProject]);
+  }, [transactions, selectedCategory, selectedProject, filterUnpaid, filterUninvoiced]);
 
-const uninvoicedAmount = useMemo(() => {
-  return filteredTransactions
-    .filter((tx) => !tx.isInvoiced)
-    .reduce((sum, tx) => sum + tx.amount, 0);
-}, [filteredTransactions]);
+  const totalExpense = useMemo(() => {
+    return filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredTransactions]);
+
+  // 计算未开票金额
+  const uninvoicedAmount = useMemo(() => {
+    return filteredTransactions
+      .filter((tx) => !tx.isInvoiced)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredTransactions]);
+
+  // 计算未付款金额
+  const unpaidAmount = useMemo(() => {
+    return filteredTransactions
+      .filter((tx) => !tx.isPaid)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [filteredTransactions]);
 
   const handleTransactionPress = useCallback((transactionId: string) => {
     router.push('/expenses/edit', { id: transactionId });
@@ -276,7 +292,7 @@ const uninvoicedAmount = useMemo(() => {
   }, [projects, categories, theme, styles, handleTransactionPress]);
 
   const renderFilterButton = () => {
-    if (selectedCategory || selectedProject) {
+    if (selectedCategory || selectedProject || filterUnpaid !== null || filterUninvoiced !== null) {
       return (
         <TouchableOpacity
           style={{
@@ -290,6 +306,8 @@ const uninvoicedAmount = useMemo(() => {
           onPress={() => {
             setSelectedCategory(null);
             setSelectedProject(null);
+            setFilterUnpaid(null);
+            setFilterUninvoiced(null);
           }}
         >
           <ThemedText variant="caption" color={theme.textSecondary}>
@@ -331,42 +349,58 @@ const uninvoicedAmount = useMemo(() => {
           </TouchableOpacity>
         </View>
 
+        {/* 总支出、未付款金额、未开票金额并排显示 */}
         <View style={{
-  paddingHorizontal: Spacing.lg,
-  marginBottom: Spacing.lg,
-  flexDirection: 'row',
-  gap: Spacing.md,
-}}>
-  {/* 总支出卡片 */}
-  <ThemedView level="default" style={{
-    flex: 1,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
-  }}>
-    <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4 }}>
-      总支出
-    </ThemedText>
-    <ThemedText variant="h2" color={theme.primary}>
-      {formatCurrency(totalExpense)}
-    </ThemedText>
-  </ThemedView>
+          paddingHorizontal: Spacing.lg,
+          marginBottom: Spacing.lg,
+          flexDirection: 'row',
+          gap: Spacing.sm,
+        }}>
+          {/* 总支出卡片 */}
+          <ThemedView level="default" style={{
+            flex: 1,
+            borderRadius: BorderRadius.lg,
+            padding: Spacing.md,
+            boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
+          }}>
+            <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4, fontSize: 11 }}>
+              总支出
+            </ThemedText>
+            <ThemedText variant="h3" color={theme.primary}>
+              {formatCurrency(totalExpense)}
+            </ThemedText>
+          </ThemedView>
 
-  {/* 未开票金额卡片 */}
-  <ThemedView level="default" style={{
-    flex: 1,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
-  }}>
-    <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4 }}>
-      未开票金额
-    </ThemedText>
-    <ThemedText variant="h2" color={theme.error}>
-      {formatCurrency(uninvoicedAmount)}
-    </ThemedText>
-  </ThemedView>
-</View>
+          {/* 未付款金额卡片 */}
+          <ThemedView level="default" style={{
+            flex: 1,
+            borderRadius: BorderRadius.lg,
+            padding: Spacing.md,
+            boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
+          }}>
+            <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4, fontSize: 11 }}>
+              未付款金额
+            </ThemedText>
+            <ThemedText variant="h3" color={theme.accent}>
+              {formatCurrency(unpaidAmount)}
+            </ThemedText>
+          </ThemedView>
+
+          {/* 未开票金额卡片 */}
+          <ThemedView level="default" style={{
+            flex: 1,
+            borderRadius: BorderRadius.lg,
+            padding: Spacing.md,
+            boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
+          }}>
+            <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4, fontSize: 11 }}>
+              未开票金额
+            </ThemedText>
+            <ThemedText variant="h3" color={theme.error}>
+              {formatCurrency(uninvoicedAmount)}
+            </ThemedText>
+          </ThemedView>
+        </View>
 
         <View style={styles.filterRow}>
           <ThemedText variant="h4" color={theme.textSecondary}>
@@ -409,6 +443,51 @@ const uninvoicedAmount = useMemo(() => {
               <FontAwesome6 name="chevron-down" size={12} color={theme.textMuted} />
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* 状态筛选按钮 */}
+        <View style={[styles.filterContainer, { marginBottom: Spacing.lg }]}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: filterUnpaid === true ? theme.accent + '20' : theme.backgroundTertiary,
+                borderWidth: filterUnpaid === true ? 1 : 0,
+                borderColor: filterUnpaid === true ? theme.accent : 'transparent',
+              }
+            ]}
+            onPress={() => setFilterUnpaid(filterUnpaid === true ? null : true)}
+          >
+            <FontAwesome6 name="wallet" size={14} color={filterUnpaid === true ? theme.accent : theme.textSecondary} />
+            <ThemedText
+              variant="caption"
+              color={filterUnpaid === true ? theme.accent : theme.textMuted}
+              style={styles.filterButtonText}
+            >
+              未付款
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: filterUninvoiced === true ? theme.error + '20' : theme.backgroundTertiary,
+                borderWidth: filterUninvoiced === true ? 1 : 0,
+                borderColor: filterUninvoiced === true ? theme.error : 'transparent',
+              }
+            ]}
+            onPress={() => setFilterUninvoiced(filterUninvoiced === true ? null : true)}
+          >
+            <FontAwesome6 name="file-invoice" size={14} color={filterUninvoiced === true ? theme.error : theme.textSecondary} />
+            <ThemedText
+              variant="caption"
+              color={filterUninvoiced === true ? theme.error : theme.textMuted}
+              style={styles.filterButtonText}
+            >
+              未开票
+            </ThemedText>
+          </TouchableOpacity>
         </View>
 
         <FlatList

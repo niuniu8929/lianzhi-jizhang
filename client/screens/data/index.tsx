@@ -205,6 +205,12 @@ export default function DataScreen() {
   const [projectSelectorVisible, setProjectSelectorVisible] = useState(false);
   const [deliveryRecordsMap, setDeliveryRecordsMap] = useState<Record<string, DeliveryRecord[]>>({});
 
+  // 零星采购开票收款记录相关状态
+  const [deliveryProjects, setDeliveryProjects] = useState<Project[]>([]);
+  const [selectedDeliveryProjectId, setSelectedDeliveryProjectId] = useState<string | null>(null);
+  const [deliveryRecords, setDeliveryRecords] = useState<DeliveryRecord[]>([]);
+  const [deliveryProjectSelectorVisible, setDeliveryProjectSelectorVisible] = useState(false);
+
   const showCustomAlert = (
     title: string,
     message: string,
@@ -236,6 +242,10 @@ export default function DataScreen() {
       recordsMap[record.projectId].push(record);
     });
     setDeliveryRecordsMap(recordsMap);
+
+    // 零星采购项目
+    const deliveryProjData = allProjData.filter(p => p.projectType === 'delivery');
+    setDeliveryProjects(deliveryProjData);
   };
 
   // 加载选中项目的记录
@@ -261,6 +271,29 @@ export default function DataScreen() {
     setSelectedProjectId(projectId);
     setProjectSelectorVisible(false);
   };
+
+  const handleDeliveryProjectSelect = (projectId: string) => {
+    setSelectedDeliveryProjectId(projectId);
+    setDeliveryProjectSelectorVisible(false);
+    loadDeliveryProjectRecords(projectId);
+  };
+
+  // 加载选中零星采购项目的记录
+  const loadDeliveryProjectRecords = useCallback(async (projectId: string | null) => {
+    if (!projectId) {
+      setDeliveryRecords([]);
+      return;
+    }
+
+    const records = await DeliveryRecordStorage.getByProjectId(projectId);
+    records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setDeliveryRecords(records);
+  }, []);
+
+  // 当选中的零星采购项目改变时，加载对应的记录
+  React.useEffect(() => {
+    loadDeliveryProjectRecords(selectedDeliveryProjectId);
+  }, [selectedDeliveryProjectId, loadDeliveryProjectRecords]);
 
   // 补录缺失记录
   const handleFixMissingRecords = useCallback(() => {
@@ -467,19 +500,26 @@ export default function DataScreen() {
         return;
       }
 
-      // 获取所有交易记录
+      // 获取所有交易记录和送货记录
       const allTransactions = await TransactionStorage.getAll();
+      const allDeliveryRecords = await DeliveryRecordStorage.getAll();
       const completedProjectIds = completedProjects.map(p => p.id);
 
       // 删除已完成项目的所有相关记录
       for (const projectId of completedProjectIds) {
         await PaymentRecordStorage.deleteByProjectId(projectId);
         await InvoiceRecordStorage.deleteByProjectId(projectId);
+        await DeliveryRecordStorage.deleteByProjectId(projectId);
       }
 
       // 筛选出需要保留的交易记录（不属于已完成项目的）
       const transactionsToKeep = allTransactions.filter(
         t => !completedProjectIds.includes(t.projectId)
+      );
+
+      // 筛选出需要保留的送货记录（不属于已完成项目的）
+      const deliveryRecordsToKeep = allDeliveryRecords.filter(
+        r => !completedProjectIds.includes(r.projectId)
       );
 
       // 筛选出需要保留的项目（非已完成状态）
@@ -489,9 +529,12 @@ export default function DataScreen() {
       await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projectsToKeep));
       await AsyncStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactionsToKeep));
 
+      // 统计删除的送货记录数量
+      const deletedDeliveryCount = allDeliveryRecords.length - deliveryRecordsToKeep.length;
+
       showCustomAlert(
         '清除成功',
-        `已清除 ${completedProjects.length} 个已完成项目及其相关支出记录`,
+        `已清除 ${completedProjects.length} 个已完成项目\n- 支出记录: ${allTransactions.length - transactionsToKeep.length} 条\n- 送货记录: ${deletedDeliveryCount} 条`,
         [{ text: '确定', style: 'default' }]
       );
     } catch (error) {
@@ -739,6 +782,105 @@ export default function DataScreen() {
             )}
           </ThemedView>
 
+          {/* 零星采购开票收款记录 */}
+          <ThemedView level="default" style={localStyles.section}>
+            <ThemedText variant="h4" color={theme.textSecondary} style={localStyles.sectionTitle}>
+              零星采购开票收款记录
+            </ThemedText>
+
+            {/* 项目选择器 */}
+            <TouchableOpacity
+              style={[localStyles.projectSelector, { backgroundColor: theme.backgroundTertiary }]}
+              onPress={() => setDeliveryProjectSelectorVisible(true)}
+            >
+              <ThemedText variant="body" color={selectedDeliveryProjectId ? theme.textPrimary : theme.textMuted}>
+                {selectedDeliveryProjectId
+                  ? deliveryProjects.find(p => p.id === selectedDeliveryProjectId)?.name || '选择项目'
+                  : '选择零星采购项目'
+                }
+              </ThemedText>
+              <FontAwesome6 name="chevron-down" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            {/* 送货记录统计 */}
+            {selectedDeliveryProjectId && (
+              <>
+                {/* 汇总统计卡片 */}
+                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
+                  <ThemedView level="tertiary" style={{ flex: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center' }}>
+                    <ThemedText variant="caption" color={theme.textMuted} style={{ fontSize: 10 }}>总金额</ThemedText>
+                    <ThemedText variant="body" color={theme.primary} style={{ fontWeight: '600' }}>
+                      ¥{deliveryRecords.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedView level="tertiary" style={{ flex: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center' }}>
+                    <ThemedText variant="caption" color={theme.textMuted} style={{ fontSize: 10 }}>已收款</ThemedText>
+                    <ThemedText variant="body" color={theme.success} style={{ fontWeight: '600' }}>
+                      ¥{deliveryRecords.reduce((sum, r) => sum + r.receivedAmount, 0).toLocaleString()}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedView level="tertiary" style={{ flex: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center' }}>
+                    <ThemedText variant="caption" color={theme.textMuted} style={{ fontSize: 10 }}>已开票</ThemedText>
+                    <ThemedText variant="body" color={theme.error} style={{ fontWeight: '600' }}>
+                      ¥{deliveryRecords.reduce((sum, r) => sum + r.invoiceAmount, 0).toLocaleString()}
+                    </ThemedText>
+                  </ThemedView>
+                </View>
+
+                {/* 未收款和未开票金额 */}
+                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
+                  <ThemedView level="tertiary" style={{ flex: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center' }}>
+                    <ThemedText variant="caption" color={theme.textMuted} style={{ fontSize: 10 }}>未收款</ThemedText>
+                    <ThemedText variant="body" color={theme.accent} style={{ fontWeight: '600' }}>
+                      ¥{(deliveryRecords.reduce((sum, r) => sum + r.amount, 0) - deliveryRecords.reduce((sum, r) => sum + r.receivedAmount, 0)).toLocaleString()}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedView level="tertiary" style={{ flex: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center' }}>
+                    <ThemedText variant="caption" color={theme.textMuted} style={{ fontSize: 10 }}>未开票</ThemedText>
+                    <ThemedText variant="body" color={theme.error} style={{ fontWeight: '600' }}>
+                      ¥{(deliveryRecords.reduce((sum, r) => sum + r.amount, 0) - deliveryRecords.reduce((sum, r) => sum + r.invoiceAmount, 0)).toLocaleString()}
+                    </ThemedText>
+                  </ThemedView>
+                </View>
+
+                {/* 送货记录列表 */}
+                <ThemedText variant="caption" color={theme.textSecondary} style={localStyles.recordSubTitle}>
+                  送货记录 ({deliveryRecords.length})
+                </ThemedText>
+                {deliveryRecords.length > 0 ? (
+                  deliveryRecords.map((record, index) => (
+                    <View
+                      key={record.id}
+                      style={[localStyles.recordDetail, { borderBottomWidth: index === deliveryRecords.length - 1 ? 0 : 1 }]}
+                    >
+                      <View style={localStyles.recordDetailHeader}>
+                        <FontAwesome6 name="truck" size={16} color={theme.primary} />
+                        <ThemedText variant="body" color={theme.textPrimary} style={{ fontWeight: '600' }}>
+                          ¥{record.amount.toLocaleString()}
+                        </ThemedText>
+                      </View>
+                      <ThemedText variant="caption" color={theme.textMuted} style={{ marginTop: 4 }}>
+                        {record.date} · {record.description || '无描述'}
+                      </ThemedText>
+                      <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: 4 }}>
+                        <ThemedText variant="caption" color={theme.success}>
+                          已收款: ¥{record.receivedAmount.toLocaleString()}
+                        </ThemedText>
+                        <ThemedText variant="caption" color={theme.error}>
+                          已开票: ¥{record.invoiceAmount.toLocaleString()}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <ThemedText variant="caption" color={theme.textMuted} style={{ paddingVertical: Spacing.md }}>
+                    暂无送货记录
+                  </ThemedText>
+                )}
+              </>
+            )}
+          </ThemedView>
+
           <View style={{ height: Spacing['5xl'] }} />
 
         {/* 数据清理区域 */}
@@ -823,6 +965,53 @@ export default function DataScreen() {
                 ) : (
                   <ThemedText variant="body" color={theme.textMuted} style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
                     暂无项目
+                  </ThemedText>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 零星采购项目选择器 Modal */}
+      <Modal visible={deliveryProjectSelectorVisible} transparent animationType="slide">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+          activeOpacity={1}
+          onPress={() => setDeliveryProjectSelectorVisible(false)}
+        >
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: theme.backgroundDefault, borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl, padding: Spacing.xl }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg }}>
+                <ThemedText variant="h4" color={theme.textPrimary}>选择零星采购项目</ThemedText>
+                <TouchableOpacity onPress={() => setDeliveryProjectSelectorVisible(false)}>
+                  <FontAwesome6 name="xmark" size={24} color={theme.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: 400 }}>
+                {deliveryProjects.length > 0 ? (
+                  deliveryProjects.map(project => (
+                    <TouchableOpacity
+                      key={project.id}
+                      style={{
+                        paddingVertical: Spacing.md,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.borderLight,
+                      }}
+                      onPress={() => handleDeliveryProjectSelect(project.id)}
+                    >
+                      <ThemedText variant="body" color={selectedDeliveryProjectId === project.id ? theme.primary : theme.textPrimary}>
+                        {project.name}
+                      </ThemedText>
+                      <ThemedText variant="caption" color={theme.textMuted}>
+                        {project.description || '无描述'}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <ThemedText variant="body" color={theme.textMuted} style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
+                    暂无零星采购项目
                   </ThemedText>
                 )}
               </ScrollView>

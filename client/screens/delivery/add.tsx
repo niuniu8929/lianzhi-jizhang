@@ -59,7 +59,8 @@ export default function AddDeliveryRecordScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [projectName, setProjectName] = useState('');
-  
+  const [isNewProject, setIsNewProject] = useState(false); // 是否是新建项目模式
+
   // 财务信息
   const [amount, setAmount] = useState('');
   const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus>('none');
@@ -71,13 +72,16 @@ export default function AddDeliveryRecordScreen() {
     async function loadProject() {
       console.log('送货记录添加页面，项目ID:', projectId);
       if (!projectId) {
-        console.log('警告：没有项目ID');
+        // 没有项目ID，说明是新建项目模式
+        console.log('新建项目模式');
+        setIsNewProject(true);
         return;
       }
       const project = await ProjectStorage.getById(projectId);
       if (project) {
         console.log('加载项目成功:', project.name);
         setProjectName(project.name);
+        setIsNewProject(false);
       } else {
         console.log('警告：项目不存在');
       }
@@ -141,8 +145,9 @@ export default function AddDeliveryRecordScreen() {
 
   // 保存送货记录（直接使用本地路径，不上传）
   const handleSave = useCallback(async () => {
-    if (!projectId) {
-      Alert.alert('错误', '项目ID不存在');
+    // 新建项目模式下，需要验证项目名称
+    if (isNewProject && !projectName.trim()) {
+      Alert.alert('提示', '请输入项目名称');
       return;
     }
 
@@ -158,11 +163,42 @@ export default function AddDeliveryRecordScreen() {
 
     setUploading(true);
     try {
-      // 直接使用本地路径，不需要上传
+      let finalProjectId = projectId;
+      let finalProjectName = projectName;
+
+      // 如果是新建项目模式，先创建项目
+      if (isNewProject) {
+        const newProjectId = generateUUID();
+        const newProject = {
+          id: newProjectId,
+          name: projectName.trim(),
+          projectType: 'delivery' as const,
+          status: 'active' as const,
+          invoiceStatus: 'none' as const,
+          contractAmount: 0,
+          deliveryAmount: parseFloat(amount) || 0,
+          receivedAmount: parseFloat(receivedAmount) || 0,
+          invoiceAmount: parseFloat(invoiceAmount) || 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const projectSuccess = await ProjectStorage.save(newProject);
+        if (!projectSuccess) {
+          Alert.alert('错误', '创建项目失败，请重试');
+          setUploading(false);
+          return;
+        }
+
+        finalProjectId = newProjectId;
+        finalProjectName = projectName.trim();
+      }
+
+      // 创建送货记录
       const record = {
         id: generateUUID(),
-        projectId,
-        projectName,
+        projectId: finalProjectId!,
+        projectName: finalProjectName,
         description: description.trim(),
         images: images, // 使用本地路径
         date: date || new Date().toISOString(),
@@ -187,7 +223,7 @@ export default function AddDeliveryRecordScreen() {
     } finally {
       setUploading(false);
     }
-  }, [projectId, projectName, description, date, amount, invoiceStatus, invoiceAmount, receivedAmount, images, router]);
+  }, [projectId, projectName, isNewProject, description, date, amount, invoiceStatus, invoiceAmount, receivedAmount, images, router]);
 
   return (
     <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
@@ -197,7 +233,7 @@ export default function AddDeliveryRecordScreen() {
             <FontAwesome6 name="arrow-left" size={20} color={theme.textPrimary} />
           </TouchableOpacity>
           <ThemedText variant="h3" color={theme.textPrimary} style={styles.headerTitle}>
-            添加送货记录
+            {isNewProject ? '新增零星采购' : '添加送货记录'}
           </ThemedText>
           <TouchableOpacity
             style={[styles.saveButton, uploading && styles.saveButtonDisabled]}
@@ -213,16 +249,32 @@ export default function AddDeliveryRecordScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* 项目信息 */}
-          {projectName && (
-            <ThemedView level="default" style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <FontAwesome6 name="box" size={16} color={theme.primary} />
-                <ThemedText variant="body" color={theme.textPrimary} style={styles.infoText}>
-                  {projectName}
-                </ThemedText>
-              </View>
+          {/* 项目名称 - 新建项目模式下显示输入框 */}
+          {isNewProject ? (
+            <ThemedView level="default" style={styles.formCard}>
+              <ThemedText variant="h4" color={theme.textSecondary} style={styles.formTitle}>
+                项目名称
+              </ThemedText>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.backgroundTertiary, color: theme.textPrimary }]}
+                value={projectName}
+                onChangeText={setProjectName}
+                placeholder="请输入项目名称"
+                placeholderTextColor={theme.textMuted}
+              />
             </ThemedView>
+          ) : (
+            /* 已有项目信息 */
+            projectName && (
+              <ThemedView level="default" style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                  <FontAwesome6 name="box" size={16} color={theme.primary} />
+                  <ThemedText variant="body" color={theme.textPrimary} style={styles.infoText}>
+                    {projectName}
+                  </ThemedText>
+                </View>
+              </ThemedView>
+            )
           )}
 
           {/* 送货信息 */}
