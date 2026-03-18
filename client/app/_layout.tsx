@@ -84,9 +84,11 @@ export default function RootLayout() {
   }, []);
 
   // 密码验证成功回调
-  const handleAuthSuccess = useCallback(() => {
-    setIsAuthenticated(true);
-  }, []);
+ const handleAuthSuccess = useCallback(() => {
+  // 设置密码成功后，同时更新 hasPassword 和 isAuthenticated
+  setHasPassword(true);
+  setIsAuthenticated(true);
+}, []);
 
   // 初始加载状态
   if (isLoading) {
