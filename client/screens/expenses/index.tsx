@@ -151,9 +151,11 @@ export default function ExpensesScreen() {
     });
   }, [transactions, selectedCategory, selectedProject]);
 
-  const totalExpense = useMemo(() => {
-    return filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-  }, [filteredTransactions]);
+const uninvoicedAmount = useMemo(() => {
+  return filteredTransactions
+    .filter((tx) => !tx.isInvoiced)
+    .reduce((sum, tx) => sum + tx.amount, 0);
+}, [filteredTransactions]);
 
   const handleTransactionPress = useCallback((transactionId: string) => {
     router.push('/expenses/edit', { id: transactionId });
@@ -330,22 +332,41 @@ export default function ExpensesScreen() {
         </View>
 
         <View style={{
-          paddingHorizontal: Spacing.lg,
-          marginBottom: Spacing.lg,
-        }}>
-          <ThemedView level="default" style={{
-            borderRadius: BorderRadius.lg,
-            padding: Spacing.lg,
-            boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
-          }}>
-            <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4 }}>
-              总支出
-            </ThemedText>
-            <ThemedText variant="h1" color={theme.primary}>
-              {formatCurrency(totalExpense)}
-            </ThemedText>
-          </ThemedView>
-        </View>
+  paddingHorizontal: Spacing.lg,
+  marginBottom: Spacing.lg,
+  flexDirection: 'row',
+  gap: Spacing.md,
+}}>
+  {/* 总支出卡片 */}
+  <ThemedView level="default" style={{
+    flex: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
+  }}>
+    <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4 }}>
+      总支出
+    </ThemedText>
+    <ThemedText variant="h2" color={theme.primary}>
+      {formatCurrency(totalExpense)}
+    </ThemedText>
+  </ThemedView>
+
+  {/* 未开票金额卡片 */}
+  <ThemedView level="default" style={{
+    flex: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    boxShadow: '0px 2px 8px rgba(79, 70, 229, 0.08)',
+  }}>
+    <ThemedText variant="caption" color={theme.textSecondary} style={{ marginBottom: 4 }}>
+      未开票金额
+    </ThemedText>
+    <ThemedText variant="h2" color={theme.error}>
+      {formatCurrency(uninvoicedAmount)}
+    </ThemedText>
+  </ThemedView>
+</View>
 
         <View style={styles.filterRow}>
           <ThemedText variant="h4" color={theme.textSecondary}>
