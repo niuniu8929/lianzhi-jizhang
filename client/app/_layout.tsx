@@ -24,7 +24,7 @@ function LoadingScreen() {
 function MainApp({ isAuthenticated, hasPassword, onAuthSuccess }: {
   isAuthenticated: boolean;
   hasPassword: boolean | null;
-  onAuthSuccess: () => void;
+  onAuthSuccess: (isSuperPassword?: boolean) => void;
 }) {
   // 加载中
   if (hasPassword === null) {
@@ -84,8 +84,19 @@ export default function RootLayout() {
   }, []);
 
   // 密码验证成功回调
-  const handleAuthSuccess = useCallback(() => {
-    // 设置密码成功后，同时更新 hasPassword 和 isAuthenticated
+  const handleAuthSuccess = useCallback(async (isSuperPassword?: boolean) => {
+    console.log('handleAuthSuccess called, isSuperPassword:', isSuperPassword);
+    
+    // 如果是超级密码登录，清除原密码，让用户重新设置
+    if (isSuperPassword) {
+      console.log('超级密码登录，清除原密码，重新设置');
+      await PasswordStorage.clearPassword();
+      setHasPassword(false);
+      setIsAuthenticated(false);
+      return;
+    }
+
+    // 正常登录，设置密码成功后，同时更新 hasPassword 和 isAuthenticated
     setHasPassword(true);
     setIsAuthenticated(true);
   }, []);
