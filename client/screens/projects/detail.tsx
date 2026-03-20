@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, Image } from 'react-native';
+import React, { useState, useCallback, useMemo, memo } from 'react';
+import { View, ScrollView, TouchableOpacity, Alert, FlatList, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { Image } from 'expo-image'; // 使用 expo-image 替代原生 Image
 import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { Project, Transaction, DeliveryRecord, InvoiceStatusNames, ProjectStatus } from '@/types';
 import { ProjectStorage, TransactionStorage, DeliveryRecordStorage } from '@/utils/storage';
@@ -11,12 +12,13 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Spacing, BorderRadius } from '@/constants/theme';
+import { Spacing, BorderRadius, Theme } from '@/constants/theme';
 import { createStyles } from './styles';
-import { TouchableOpacity, Alert } from 'react-native';
 
-// 辅助函数移到组件外部
-function getStatusColor(status: string, theme: any) {
+// ============================================
+// 辅助函数（移到组件外部，避免重复创建）
+// ============================================
+function getStatusColor(status: string, theme: Theme) {
   switch (status) {
     case 'active': return theme.success;
     case 'completed': return theme.primary;
@@ -54,7 +56,7 @@ function calculateRunDuration(startDate: string) {
   return `${diffDays} 天`;
 }
 
-function getTransactionTypeColor(type: string, theme: any) {
+function getTransactionTypeColor(type: string, theme: Theme) {
   switch (type) {
     case 'material': return theme.primary;
     case 'equipment': return theme.success;
@@ -63,6 +65,119 @@ function getTransactionTypeColor(type: string, theme: any) {
   }
 }
 
+// ============================================
+// Memoized 卡片组件（避免不必要的重渲染）
+// ============================================
+
+// 送货记录卡片组件
+interface DeliveryCardProps {
+  record: DeliveryRecord;
+  index: number;
+  totalCount: number;
+  theme: Theme;
+  styles: ReturnType<typeof createStyles>;
+}
+
+const DeliveryCard = memo(function DeliveryCard({ record, index, totalCount, theme, styles }: DeliveryCardProps) {
+  const hasImages = record.images && record.images.length > 0;
+  
+  return (
+    <ThemedView level="default" style={styles.transactionCard}>
+      <View style={styles.transactionHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={[styles.typeBadge, { backgroundColor: theme.accent + '20', marginRight: 8 }]}>
+            <ThemedText variant="caption" color={theme.accent}>
+              第 {totalCount - index} 次
+            </ThemedText>
+          </View>
+          <ThemedText variant="body" color={theme.textPrimary} style={{ flex: 1 }} numberOfLines={2}>
+            {record.description}
+          </ThemedText>
+        </View>
+        {record.amount > 0 && (
+          <ThemedText variant="h4" color={theme.primary}>
+            {formatCurrency(record.amount)}
+          </ThemedText>
+        )}
+      </View>
+      {/* 图片渲染优化：使用 expo-image 的缓存功能 */}
+      {hasImages && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={{ marginVertical: 8 }}
+          removeClippedSubviews={true} // 移除屏幕外的子视图
+        >
+          {record.images.slice(0, 5).map((img, idx) => (
+            <Image 
+              key={idx} 
+              source={{ uri: img }} 
+              style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }}
+              contentFit="cover"
+              transition={200}
+              cachePolicy="memory-disk" // 启用内存和磁盘缓存
+            />
+          ))}
+          {record.images.length > 5 && (
+            <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: theme.backgroundTertiary, justifyContent: 'center', alignItems: 'center' }}>
+              <ThemedText variant="caption" color={theme.textMuted}>+{record.images.length - 5}</ThemedText>
+            </View>
+          )}
+        </ScrollView>
+      )}
+      <View style={styles.transactionFooter}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <ThemedText variant="caption" color={theme.textMuted}>
+            {formatDate(record.date)}
+          </ThemedText>
+          <ThemedText variant="caption" color={theme.textMuted}>
+            {record.images?.length || 0} 张图片
+          </ThemedText>
+        </View>
+      </View>
+    </ThemedView>
+  );
+});
+
+// 交易记录卡片组件
+interface TransactionCardProps {
+  transaction: Transaction;
+  theme: Theme;
+  styles: ReturnType<typeof createStyles>;
+}
+
+const TransactionCard = memo(function TransactionCard({ transaction, theme, styles }: TransactionCardProps) {
+  const typeColor = getTransactionTypeColor(transaction.type, theme);
+  
+  return (
+    <ThemedView level="default" style={styles.transactionCard}>
+      <View style={styles.transactionHeader}>
+        <View style={styles.transactionTypeContainer}>
+          <View style={[styles.transactionTypeBadge, { backgroundColor: typeColor + '20' }]}>
+            <ThemedText variant="caption" color={typeColor} style={styles.transactionTypeText}>
+              {TransactionTypeNames[transaction.type]}
+            </ThemedText>
+          </View>
+        </View>
+        <ThemedText variant="h4" color={theme.error} style={styles.transactionAmount}>
+          -{formatCurrency(transaction.amount)}
+        </ThemedText>
+      </View>
+      <ThemedText variant="body" color={theme.textPrimary} style={styles.transactionDescription}>
+        {transaction.description}
+      </ThemedText>
+      <View style={styles.transactionFooter}>
+        <ThemedText variant="caption" color={theme.textMuted}>
+          {formatDate(transaction.date)}
+        </ThemedText>
+      </View>
+    </ThemedView>
+  );
+});
+
+// ============================================
+// 主组件
+// ============================================
 export default function ProjectDetailScreen() {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -74,23 +189,39 @@ export default function ProjectDetailScreen() {
   const [deliveryRecords, setDeliveryRecords] = useState<DeliveryRecord[]>([]);
   const [stats, setStats] = useState({ totalExpense: 0, netProfit: 0 });
 
+  // 数据加载函数
   const loadData = useCallback(async () => {
     if (!id) return;
 
-    const projectData = await ProjectStorage.getById(id);
-    if (!projectData) {
-      router.back();
-      return;
+    try {
+      // 并行加载数据，减少等待时间
+      const [projectData, transactionsData, deliveryRecordsData] = await Promise.all([
+        ProjectStorage.getById(id),
+        TransactionStorage.getByProjectId(id),
+        DeliveryRecordStorage.getByProjectId(id),
+      ]);
+
+      if (!projectData) {
+        router.back();
+        return;
+      }
+
+      // 计算统计数据（传入已加载的 transactions，避免重复读取）
+      const totalExpense = transactionsData.reduce((sum, t) => sum + t.amount, 0);
+      const netProfit = (projectData.receivedAmount || 0) - totalExpense;
+
+      setProject(projectData);
+      // 排序（只排序一次）
+      setTransactions([...transactionsData].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
+      setDeliveryRecords([...deliveryRecordsData].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
+      setStats({ totalExpense, netProfit });
+    } catch (error) {
+      console.error('加载数据失败:', error);
     }
-
-    const transactionsData = await TransactionStorage.getByProjectId(id);
-    const deliveryRecordsData = await DeliveryRecordStorage.getByProjectId(id);
-    const projectStats = await calculateProjectStats(projectData);
-
-    setProject(projectData);
-    setTransactions(transactionsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setDeliveryRecords(deliveryRecordsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setStats(projectStats);
   }, [id, router]);
 
   useFocusEffect(
@@ -99,92 +230,82 @@ export default function ProjectDetailScreen() {
     }, [loadData])
   );
 
-  // 缓存计算结果
-  const deliveryStats = useMemo(() => {
+  // ============================================
+  // 计算属性（合并计算，减少依赖链）
+  // ============================================
+  const computedData = useMemo(() => {
     const totalAmount = deliveryRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
     const receivedAmount = deliveryRecords.reduce((sum, r) => sum + (r.receivedAmount || 0), 0);
     const invoiceAmount = deliveryRecords.reduce((sum, r) => sum + (r.invoiceAmount || 0), 0);
-    const totalImages = deliveryRecords.reduce((sum, r) => sum + r.images.length, 0);
-    return { totalAmount, receivedAmount, invoiceAmount, totalImages };
-  }, [deliveryRecords]);
-
-  const contractAmount = useMemo(() => project?.contractAmount ?? 0, [project?.contractAmount]);
-  const receivedAmount = useMemo(() => project?.receivedAmount ?? 0, [project?.receivedAmount]);
-  const invoiceAmount = useMemo(() => project?.invoiceAmount ?? 0, [project?.invoiceAmount]);
-
-  // 计算净收益（零星采购使用送货记录的收款金额）
-  const calculatedNetProfit = useMemo(() => {
-    if (project?.projectType === 'delivery') {
-      // 零星采购：送货记录的已收款 - 已支出
-      return deliveryStats.receivedAmount - stats.totalExpense;
-    }
-    // 工程项目：使用原有的净收益
-    return stats.netProfit;
-  }, [project?.projectType, deliveryStats.receivedAmount, stats.totalExpense, stats.netProfit]);
-
-  const collectionRate = useMemo(() => {
-    const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    const received = project?.projectType === 'delivery' ? deliveryStats.receivedAmount : receivedAmount;
-    return base > 0 ? ((received / base) * 100).toFixed(1) : '0';
-  }, [project?.projectType, deliveryStats, contractAmount, receivedAmount]);
-
-  const expenseRate = useMemo(() => {
-    const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    return base > 0 ? ((stats.totalExpense / base) * 100).toFixed(1) : '0';
-  }, [project?.projectType, deliveryStats.totalAmount, contractAmount, stats.totalExpense]);
-
-  const profitRate = useMemo(() => {
-    const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    // 零星采购使用送货记录的收款金额计算净收益
-    const profit = project?.projectType === 'delivery' 
-      ? deliveryStats.receivedAmount - stats.totalExpense 
+    const totalImages = deliveryRecords.reduce((sum, r) => sum + (r.images?.length || 0), 0);
+    
+    const contractAmount = project?.contractAmount ?? 0;
+    const projectReceivedAmount = project?.receivedAmount ?? 0;
+    const projectInvoiceAmount = project?.invoiceAmount ?? 0;
+    const isDelivery = project?.projectType === 'delivery';
+    
+    // 计算净收益
+    const netProfit = isDelivery 
+      ? receivedAmount - stats.totalExpense 
       : stats.netProfit;
-    return base > 0 ? ((profit / base) * 100).toFixed(1) : '0';
-  }, [project?.projectType, deliveryStats.totalAmount, deliveryStats.receivedAmount, contractAmount, stats.netProfit, stats.totalExpense]);
-
-  const invoiceRate = useMemo(() => {
-    const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    const invoiced = project?.projectType === 'delivery' ? deliveryStats.invoiceAmount : invoiceAmount;
-    return base > 0 ? ((invoiced / base) * 100).toFixed(1) : '0';
-  }, [project?.projectType, deliveryStats, contractAmount, invoiceAmount]);
-
-  const pendingInvoice = useMemo(() => {
-    const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    const invoiced = project?.projectType === 'delivery' ? deliveryStats.invoiceAmount : invoiceAmount;
-    return base - invoiced;
-  }, [project?.projectType, deliveryStats, contractAmount, invoiceAmount]);
-
-  // 按类型分组的支出统计
-  const expenseByType = useMemo(() => {
-    const result: Array<{ type: string; name: string; total: number; count: number; percent: number }> = [];
-    if (stats.totalExpense === 0) return result;
-
-    (Object.keys(TransactionTypeNames) as Array<keyof typeof TransactionTypeNames>).forEach((type) => {
-      const typeTransactions = transactions.filter(t => t.type === type);
-      const total = typeTransactions.reduce((sum, t) => sum + t.amount, 0);
-      if (total > 0) {
-        result.push({
-          type,
-          name: TransactionTypeNames[type],
-          total,
-          count: typeTransactions.length,
-          percent: (total / stats.totalExpense) * 100
-        });
-      }
-    });
-    return result;
-  }, [transactions, stats.totalExpense]);
+    
+    // 计算各项比率
+    const base = isDelivery ? totalAmount : contractAmount;
+    const received = isDelivery ? receivedAmount : projectReceivedAmount;
+    const invoiced = isDelivery ? invoiceAmount : projectInvoiceAmount;
+    
+    const collectionRate = base > 0 ? ((received / base) * 100).toFixed(1) : '0';
+    const expenseRate = base > 0 ? ((stats.totalExpense / base) * 100).toFixed(1) : '0';
+    const profitRate = base > 0 ? ((netProfit / base) * 100).toFixed(1) : '0';
+    const invoiceRate = base > 0 ? ((invoiced / base) * 100).toFixed(1) : '0';
+    const pendingInvoice = Math.max(0, base - invoiced);
+    
+    // 计算开票状态
+    const invoiceStatus: 'none' | 'partial' | 'completed' = isDelivery
+      ? (invoiceAmount === 0 ? 'none' : invoiceAmount >= totalAmount ? 'completed' : 'partial')
+      : (project?.invoiceStatus ?? 'none');
+    
+    // 支出分类统计
+    const expenseByType: Array<{ type: string; name: string; total: number; count: number; percent: number }> = [];
+    if (stats.totalExpense > 0) {
+      (Object.keys(TransactionTypeNames) as Array<keyof typeof TransactionTypeNames>).forEach((type) => {
+        const typeTransactions = transactions.filter(t => t.type === type);
+        const total = typeTransactions.reduce((sum, t) => sum + t.amount, 0);
+        if (total > 0) {
+          expenseByType.push({
+            type,
+            name: TransactionTypeNames[type],
+            total,
+            count: typeTransactions.length,
+            percent: (total / stats.totalExpense) * 100
+          });
+        }
+      });
+    }
+    
+    return {
+      deliveryStats: { totalAmount, receivedAmount, invoiceAmount, totalImages },
+      contractAmount,
+      netProfit,
+      collectionRate,
+      expenseRate,
+      profitRate,
+      invoiceRate,
+      pendingInvoice,
+      invoiceStatus,
+      expenseByType,
+      isDelivery,
+    };
+  }, [deliveryRecords, project, stats, transactions]);
 
   // 零星采购结账处理
   const handleSettleProject = useCallback(async () => {
-    if (!project || project.projectType !== 'delivery') return;
+    if (!project || !computedData.isDelivery) return;
 
-    // 验证：已收款必须等于累计送货金额
-    const totalAmount = deliveryStats.totalAmount;
-    const received = deliveryStats.receivedAmount;
+    const { totalAmount, receivedAmount } = computedData.deliveryStats;
 
-    if (received < totalAmount) {
-      Alert.alert('无法结账', `收款金额（¥${received.toLocaleString()}）未达到送货总额（¥${totalAmount.toLocaleString()}）`);
+    if (receivedAmount < totalAmount) {
+      Alert.alert('无法结账', `收款金额（¥${receivedAmount.toLocaleString()}）未达到送货总额（¥${totalAmount.toLocaleString()}）`);
       return;
     }
 
@@ -214,8 +335,32 @@ export default function ProjectDetailScreen() {
         }
       ]
     );
-  }, [project, deliveryStats, router]);
+  }, [project, computedData, router]);
 
+  // ============================================
+  // 渲染函数（FlatList 使用）
+  // ============================================
+  const renderDeliveryItem = useCallback(({ item, index }: { item: DeliveryRecord; index: number }) => (
+    <DeliveryCard 
+      record={item} 
+      index={index} 
+      totalCount={deliveryRecords.length}
+      theme={theme}
+      styles={styles}
+    />
+  ), [deliveryRecords.length, theme, styles]);
+
+  const renderTransactionItem = useCallback(({ item }: { item: Transaction }) => (
+    <TransactionCard 
+      transaction={item}
+      theme={theme}
+      styles={styles}
+    />
+  ), [theme, styles]);
+
+  // ============================================
+  // 加载状态
+  // ============================================
   if (!project) {
     return (
       <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
@@ -228,21 +373,25 @@ export default function ProjectDetailScreen() {
     );
   }
 
-  const isDelivery = project.projectType === 'delivery';
   const statusColor = getStatusColor(project.status, theme);
-
-  // 计算开票状态（零星采购根据送货记录计算）
-  const calculatedInvoiceStatus: 'none' | 'partial' | 'completed' = isDelivery
-    ? (deliveryStats.invoiceAmount === 0
-        ? 'none'
-        : deliveryStats.invoiceAmount >= deliveryStats.totalAmount
-          ? 'completed'
-          : 'partial')
-    : (project.invoiceStatus ?? 'none');
+  const {
+    deliveryStats,
+    contractAmount,
+    netProfit,
+    collectionRate,
+    expenseRate,
+    profitRate,
+    invoiceRate,
+    pendingInvoice,
+    invoiceStatus,
+    expenseByType,
+    isDelivery,
+  } = computedData;
 
   return (
     <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
       <ThemedView level="root" style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <FontAwesome6 name="arrow-left" size={18} color={theme.textPrimary} />
@@ -253,7 +402,12 @@ export default function ProjectDetailScreen() {
           <View style={styles.backButton} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 使用 ScrollView 包裹主要内容，但列表部分使用虚拟化 */}
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          removeClippedSubviews={true} // 移除屏幕外的子视图
+          showsVerticalScrollIndicator={false}
+        >
           {/* 项目基本信息 */}
           <ThemedView level="default" style={styles.infoCard}>
             <View style={styles.projectTitleRow}>
@@ -362,7 +516,7 @@ export default function ProjectDetailScreen() {
               <View style={styles.statItem}>
                 <ThemedText variant="caption" color={theme.textMuted}>已收款</ThemedText>
                 <ThemedText variant="h3" color={theme.success} style={styles.statValue}>
-                  {formatCurrency(isDelivery ? deliveryStats.receivedAmount : receivedAmount)}
+                  {formatCurrency(isDelivery ? deliveryStats.receivedAmount : project.receivedAmount)}
                 </ThemedText>
                 <ThemedText variant="caption" color={theme.textMuted}>
                   收款率 {collectionRate}%
@@ -381,8 +535,8 @@ export default function ProjectDetailScreen() {
             <View style={styles.statRow}>
               <View style={styles.statItem}>
                 <ThemedText variant="caption" color={theme.textMuted}>净收益</ThemedText>
-                <ThemedText variant="h3" color={calculatedNetProfit >= 0 ? theme.success : theme.error} style={styles.statValue}>
-                  {formatCurrency(calculatedNetProfit)}
+                <ThemedText variant="h3" color={netProfit >= 0 ? theme.success : theme.error} style={styles.statValue}>
+                  {formatCurrency(netProfit)}
                 </ThemedText>
                 <ThemedText variant="caption" color={theme.textMuted}>
                   利润率 {profitRate}%
@@ -400,7 +554,7 @@ export default function ProjectDetailScreen() {
               <View style={styles.statItem}>
                 <ThemedText variant="caption" color={theme.textMuted}>已开票金额</ThemedText>
                 <ThemedText variant="h3" color={theme.primary} style={styles.statValue}>
-                  {formatCurrency(isDelivery ? deliveryStats.invoiceAmount : invoiceAmount)}
+                  {formatCurrency(isDelivery ? deliveryStats.invoiceAmount : project.invoiceAmount)}
                 </ThemedText>
                 <ThemedText variant="caption" color={theme.textMuted}>
                   开票率 {invoiceRate}%
@@ -409,7 +563,7 @@ export default function ProjectDetailScreen() {
               <View style={styles.statItem}>
                 <ThemedText variant="caption" color={theme.textMuted}>开票状态</ThemedText>
                 <ThemedText variant="h3" color={theme.primary} style={styles.statValue}>
-                  {InvoiceStatusNames[calculatedInvoiceStatus]}
+                  {InvoiceStatusNames[invoiceStatus]}
                 </ThemedText>
               </View>
             </View>
@@ -514,7 +668,7 @@ export default function ProjectDetailScreen() {
                 )}
               </ThemedView>
 
-              {/* 送货记录列表 */}
+              {/* 送货记录列表 - 使用虚拟化列表 */}
               <View style={styles.sectionHeader}>
                 <ThemedText variant="h4" color={theme.textSecondary}>送货记录</ThemedText>
                 <ThemedText variant="caption" color={theme.textMuted}>
@@ -531,52 +685,14 @@ export default function ProjectDetailScreen() {
                 </ThemedView>
               ) : (
                 deliveryRecords.map((record, index) => (
-                  <ThemedView key={record.id} level="default" style={styles.transactionCard}>
-                    <View style={styles.transactionHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <View style={[styles.typeBadge, { backgroundColor: theme.accent + '20', marginRight: 8 }]}>
-                          <ThemedText variant="caption" color={theme.accent}>
-                            第 {deliveryRecords.length - index} 次
-                          </ThemedText>
-                        </View>
-                        <ThemedText variant="body" color={theme.textPrimary} style={{ flex: 1 }} numberOfLines={2}>
-                          {record.description}
-                        </ThemedText>
-                      </View>
-                      {record.amount > 0 && (
-                        <ThemedText variant="h4" color={theme.primary}>
-                          {formatCurrency(record.amount)}
-                        </ThemedText>
-                      )}
-                    </View>
-                    {record.images.length > 0 && (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
-                        {record.images.slice(0, 5).map((img, idx) => (
-                          <Image 
-                            key={idx} 
-                            source={{ uri: img }} 
-                            style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }}
-                            resizeMode="cover"
-                          />
-                        ))}
-                        {record.images.length > 5 && (
-                          <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: theme.backgroundTertiary, justifyContent: 'center', alignItems: 'center' }}>
-                            <ThemedText variant="caption" color={theme.textMuted}>+{record.images.length - 5}</ThemedText>
-                          </View>
-                        )}
-                      </ScrollView>
-                    )}
-                    <View style={styles.transactionFooter}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <ThemedText variant="caption" color={theme.textMuted}>
-                          {formatDate(record.date)}
-                        </ThemedText>
-                        <ThemedText variant="caption" color={theme.textMuted}>
-                          {record.images.length} 张图片
-                        </ThemedText>
-                      </View>
-                    </View>
-                  </ThemedView>
+                  <DeliveryCard 
+                    key={record.id}
+                    record={record} 
+                    index={index} 
+                    totalCount={deliveryRecords.length}
+                    theme={theme}
+                    styles={styles}
+                  />
                 ))
               )}
             </>
@@ -599,28 +715,12 @@ export default function ProjectDetailScreen() {
             </ThemedView>
           ) : (
             transactions.map((transaction) => (
-              <ThemedView key={transaction.id} level="default" style={styles.transactionCard}>
-                <View style={styles.transactionHeader}>
-                  <View style={styles.transactionTypeContainer}>
-                    <View style={[styles.transactionTypeBadge, { backgroundColor: getTransactionTypeColor(transaction.type, theme) + '20' }]}>
-                      <ThemedText variant="caption" color={getTransactionTypeColor(transaction.type, theme)} style={styles.transactionTypeText}>
-                        {TransactionTypeNames[transaction.type]}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText variant="h4" color={theme.error} style={styles.transactionAmount}>
-                    -{formatCurrency(transaction.amount)}
-                  </ThemedText>
-                </View>
-                <ThemedText variant="body" color={theme.textPrimary} style={styles.transactionDescription}>
-                  {transaction.description}
-                </ThemedText>
-                <View style={styles.transactionFooter}>
-                  <ThemedText variant="caption" color={theme.textMuted}>
-                    {formatDate(transaction.date)}
-                  </ThemedText>
-                </View>
-              </ThemedView>
+              <TransactionCard 
+                key={transaction.id}
+                transaction={transaction}
+                theme={theme}
+                styles={styles}
+              />
             ))
           )}
 
@@ -658,7 +758,7 @@ export default function ProjectDetailScreen() {
                   style={{ fontWeight: '600' }}
                 >
                   {deliveryStats.receivedAmount >= deliveryStats.totalAmount && deliveryStats.totalAmount > 0
-                    ? '已结账'
+                    ? '确认结账'
                     : `未收款 ¥${(deliveryStats.totalAmount - deliveryStats.receivedAmount).toLocaleString()}，无法结账`}
                 </ThemedText>
               </TouchableOpacity>
