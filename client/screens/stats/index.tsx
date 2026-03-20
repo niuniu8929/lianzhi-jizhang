@@ -30,27 +30,33 @@ export default function StatsScreen() {
   const [deliveryRecordProjectId, setDeliveryRecordProjectId] = useState<string | null>(null);
   const [deliveryRecordSelectorVisible, setDeliveryRecordSelectorVisible] = useState(false);
 
-  const loadData = useCallback(async () => {
-    const projectData = await ProjectStorage.getAll();
-    const transactionData = await TransactionStorage.getAll();
-    const deliveryRecordsData = await DeliveryRecordStorage.getAll();
+const loadData = useCallback(async () => {
+  const projectData = await ProjectStorage.getAll();
+  const transactionData = await TransactionStorage.getAll();
+  const deliveryRecordsData = await DeliveryRecordStorage.getAll();
 
-    const statsMap = new Map<string, { totalIncome: number; totalExpense: number; netProfit: number }>();
+  console.log('[DEBUG] loadData - deliveryRecordsData:', deliveryRecordsData.length);
+  if (deliveryRecordsData.length > 0) {
+    console.log('[DEBUG] First delivery record:', JSON.stringify(deliveryRecordsData[0], null, 2));
+  }
 
-    for (const project of projectData) {
-      const stats = await calculateProjectStats(project);
-      statsMap.set(project.id, {
-        totalIncome: stats.totalIncome,
-        totalExpense: stats.totalExpense,
-        netProfit: stats.netProfit,
-      });
-    }
+  const statsMap = new Map<string, { totalIncome: number; totalExpense: number; netProfit: number }>();
 
-    setProjects(projectData);
-    setTransactions(transactionData);
-    setDeliveryRecords(deliveryRecordsData);
-    setProjectStats(statsMap);
-  }, []);
+  for (const project of projectData) {
+    const stats = await calculateProjectStats(project);
+    statsMap.set(project.id, {
+      totalIncome: stats.totalIncome,
+      totalExpense: stats.totalExpense,
+      netProfit: stats.netProfit,
+    });
+  }
+
+  setProjects(projectData);
+  setTransactions(transactionData);
+  setDeliveryRecords(deliveryRecordsData);
+  setProjectStats(statsMap);
+}, []);
+
 
  const getDeliveryTotalAmount = useCallback((projectId: string) => {
   const records = deliveryRecords.filter(r => r.projectId === projectId);
