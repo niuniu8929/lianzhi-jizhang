@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
-import { View, ScrollView, Image, TouchableOpacity, Alert, FlatList } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, ScrollView, Image } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { Project, Transaction, DeliveryRecord, InvoiceStatusNames, ProjectStatus } from '@/types';
@@ -13,6 +13,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, BorderRadius } from '@/constants/theme';
 import { createStyles } from './styles';
+import { TouchableOpacity, Alert } from 'react-native';
 
 // 辅助函数移到组件外部
 function getStatusColor(status: string, theme: any) {
@@ -61,98 +62,6 @@ function getTransactionTypeColor(type: string, theme: any) {
     default: return theme.textSecondary;
   }
 }
-
-// 送货记录项组件
-const DeliveryRecordItem = memo(({ record, index, totalCount, theme }: { 
-  record: DeliveryRecord; 
-  index: number; 
-  totalCount: number;
-  theme: any;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  
-  return (
-    <ThemedView level="default" style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <View style={[styles.typeBadge, { backgroundColor: theme.accent + '20', marginRight: 8 }]}>
-            <ThemedText variant="caption" color={theme.accent}>
-              第 {totalCount - index} 次
-            </ThemedText>
-          </View>
-          <ThemedText variant="body" color={theme.textPrimary} style={{ flex: 1 }} numberOfLines={2}>
-            {record.description}
-          </ThemedText>
-        </View>
-        {record.amount > 0 && (
-          <ThemedText variant="h4" color={theme.primary}>
-            {formatCurrency(record.amount)}
-          </ThemedText>
-        )}
-      </View>
-      {record.images.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
-          {record.images.slice(0, 5).map((img, idx) => (
-            <Image 
-              key={idx} 
-              source={{ uri: img }} 
-              style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }}
-              resizeMode="cover"
-            />
-          ))}
-          {record.images.length > 5 && (
-            <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: theme.backgroundTertiary, justifyContent: 'center', alignItems: 'center' }}>
-              <ThemedText variant="caption" color={theme.textMuted}>+{record.images.length - 5}</ThemedText>
-            </View>
-          )}
-        </ScrollView>
-      )}
-      <View style={styles.transactionFooter}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <ThemedText variant="caption" color={theme.textMuted}>
-            {formatDate(record.date)}
-          </ThemedText>
-          <ThemedText variant="caption" color={theme.textMuted}>
-            {record.images.length} 张图片
-          </ThemedText>
-        </View>
-      </View>
-    </ThemedView>
-  );
-});
-
-// 交易记录项组件
-const TransactionItem = memo(({ transaction, theme }: { 
-  transaction: Transaction; 
-  theme: any;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  
-  return (
-    <ThemedView level="default" style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={styles.transactionTypeContainer}>
-          <View style={[styles.transactionTypeBadge, { backgroundColor: getTransactionTypeColor(transaction.type, theme) + '20' }]}>
-            <ThemedText variant="caption" color={getTransactionTypeColor(transaction.type, theme)} style={styles.transactionTypeText}>
-              {TransactionTypeNames[transaction.type]}
-            </ThemedText>
-          </View>
-        </View>
-        <ThemedText variant="h4" color={theme.error} style={styles.transactionAmount}>
-          -{formatCurrency(transaction.amount)}
-        </ThemedText>
-      </View>
-      <ThemedText variant="body" color={theme.textPrimary} style={styles.transactionDescription}>
-        {transaction.description}
-      </ThemedText>
-      <View style={styles.transactionFooter}>
-        <ThemedText variant="caption" color={theme.textMuted}>
-          {formatDate(transaction.date)}
-        </ThemedText>
-      </View>
-    </ThemedView>
-  );
-});
 
 export default function ProjectDetailScreen() {
   const { theme, isDark } = useTheme();
@@ -206,7 +115,7 @@ export default function ProjectDetailScreen() {
   // 计算净收益（零星采购使用送货记录的收款金额）
   const calculatedNetProfit = useMemo(() => {
     if (project?.projectType === 'delivery') {
-      // 零星采购：已收款 - 已支出
+      // 零星采购：送货记录的已收款 - 已支出
       return deliveryStats.receivedAmount - stats.totalExpense;
     }
     // 工程项目：使用原有的净收益
@@ -226,8 +135,12 @@ export default function ProjectDetailScreen() {
 
   const profitRate = useMemo(() => {
     const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
-    return base > 0 ? ((calculatedNetProfit / base) * 100).toFixed(1) : '0';
-  }, [project?.projectType, deliveryStats.totalAmount, contractAmount, calculatedNetProfit]);
+    // 零星采购使用送货记录的收款金额计算净收益
+    const profit = project?.projectType === 'delivery' 
+      ? deliveryStats.receivedAmount - stats.totalExpense 
+      : stats.netProfit;
+    return base > 0 ? ((profit / base) * 100).toFixed(1) : '0';
+  }, [project?.projectType, deliveryStats.totalAmount, deliveryStats.receivedAmount, contractAmount, stats.netProfit, stats.totalExpense]);
 
   const invoiceRate = useMemo(() => {
     const base = project?.projectType === 'delivery' ? deliveryStats.totalAmount : contractAmount;
@@ -303,11 +216,6 @@ export default function ProjectDetailScreen() {
     );
   }, [project, deliveryStats, router]);
 
-  // 返回按钮处理
-  const handleGoBack = useCallback(() => {
-    router.back();
-  }, [router]);
-
   if (!project) {
     return (
       <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
@@ -336,7 +244,7 @@ export default function ProjectDetailScreen() {
     <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
       <ThemedView level="root" style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <FontAwesome6 name="arrow-left" size={18} color={theme.textPrimary} />
           </TouchableOpacity>
           <ThemedText variant="h3" color={theme.textPrimary} style={styles.headerTitle}>
@@ -621,29 +529,57 @@ export default function ProjectDetailScreen() {
                     暂无送货记录
                   </ThemedText>
                 </ThemedView>
-              ) : null}
-            </>
-          )}
-
-          {/* 使用 FlatList 渲染送货记录（优化性能） */}
-          {isDelivery && deliveryRecords.length > 0 && (
-            <FlatList
-              data={deliveryRecords}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) => (
-                <DeliveryRecordItem 
-                  record={item} 
-                  index={index} 
-                  totalCount={deliveryRecords.length}
-                  theme={theme}
-                />
+              ) : (
+                deliveryRecords.map((record, index) => (
+                  <ThemedView key={record.id} level="default" style={styles.transactionCard}>
+                    <View style={styles.transactionHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <View style={[styles.typeBadge, { backgroundColor: theme.accent + '20', marginRight: 8 }]}>
+                          <ThemedText variant="caption" color={theme.accent}>
+                            第 {deliveryRecords.length - index} 次
+                          </ThemedText>
+                        </View>
+                        <ThemedText variant="body" color={theme.textPrimary} style={{ flex: 1 }} numberOfLines={2}>
+                          {record.description}
+                        </ThemedText>
+                      </View>
+                      {record.amount > 0 && (
+                        <ThemedText variant="h4" color={theme.primary}>
+                          {formatCurrency(record.amount)}
+                        </ThemedText>
+                      )}
+                    </View>
+                    {record.images.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                        {record.images.slice(0, 5).map((img, idx) => (
+                          <Image 
+                            key={idx} 
+                            source={{ uri: img }} 
+                            style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }}
+                            resizeMode="cover"
+                          />
+                        ))}
+                        {record.images.length > 5 && (
+                          <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: theme.backgroundTertiary, justifyContent: 'center', alignItems: 'center' }}>
+                            <ThemedText variant="caption" color={theme.textMuted}>+{record.images.length - 5}</ThemedText>
+                          </View>
+                        )}
+                      </ScrollView>
+                    )}
+                    <View style={styles.transactionFooter}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <ThemedText variant="caption" color={theme.textMuted}>
+                          {formatDate(record.date)}
+                        </ThemedText>
+                        <ThemedText variant="caption" color={theme.textMuted}>
+                          {record.images.length} 张图片
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </ThemedView>
+                ))
               )}
-              scrollEnabled={false}
-              removeClippedSubviews={true}
-              maxToRenderPerBatch={10}
-              windowSize={5}
-              initialNumToRender={10}
-            />
+            </>
           )}
 
           {/* 交易记录 */}
@@ -662,16 +598,30 @@ export default function ProjectDetailScreen() {
               </ThemedText>
             </ThemedView>
           ) : (
-            <FlatList
-              data={transactions}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <TransactionItem transaction={item} theme={theme} />}
-              scrollEnabled={false}
-              removeClippedSubviews={true}
-              maxToRenderPerBatch={10}
-              windowSize={5}
-              initialNumToRender={10}
-            />
+            transactions.map((transaction) => (
+              <ThemedView key={transaction.id} level="default" style={styles.transactionCard}>
+                <View style={styles.transactionHeader}>
+                  <View style={styles.transactionTypeContainer}>
+                    <View style={[styles.transactionTypeBadge, { backgroundColor: getTransactionTypeColor(transaction.type, theme) + '20' }]}>
+                      <ThemedText variant="caption" color={getTransactionTypeColor(transaction.type, theme)} style={styles.transactionTypeText}>
+                        {TransactionTypeNames[transaction.type]}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText variant="h4" color={theme.error} style={styles.transactionAmount}>
+                    -{formatCurrency(transaction.amount)}
+                  </ThemedText>
+                </View>
+                <ThemedText variant="body" color={theme.textPrimary} style={styles.transactionDescription}>
+                  {transaction.description}
+                </ThemedText>
+                <View style={styles.transactionFooter}>
+                  <ThemedText variant="caption" color={theme.textMuted}>
+                    {formatDate(transaction.date)}
+                  </ThemedText>
+                </View>
+              </ThemedView>
+            ))
           )}
 
           {/* 零星采购结账按钮 */}
@@ -708,7 +658,7 @@ export default function ProjectDetailScreen() {
                   style={{ fontWeight: '600' }}
                 >
                   {deliveryStats.receivedAmount >= deliveryStats.totalAmount && deliveryStats.totalAmount > 0
-                    ? '确认结账'
+                    ? '已结账'
                     : `未收款 ¥${(deliveryStats.totalAmount - deliveryStats.receivedAmount).toLocaleString()}，无法结账`}
                 </ThemedText>
               </TouchableOpacity>
