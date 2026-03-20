@@ -13,11 +13,11 @@ import { ThemedView } from '@/components/ThemedView';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, BorderRadius } from '@/constants/theme';
-import { PasswordStorage } from '@/utils/password';
+import { PasswordStorage, PasswordVerifyResult } from '@/utils/password';
 
 interface PasswordScreenProps {
   mode: 'set' | 'verify';
-  onSuccess: () => void;
+  onSuccess: (isSuperPassword?: boolean) => void;
 }
 
 export default function PasswordScreen({ mode, onSuccess }: PasswordScreenProps) {
@@ -60,7 +60,7 @@ export default function PasswordScreen({ mode, onSuccess }: PasswordScreenProps)
       console.log('setPassword result:', success);
       if (success) {
         console.log('Password set success, calling onSuccess...');
-        onSuccess();
+        onSuccess(false);
       } else {
         setError('设置密码失败，请重试');
       }
@@ -85,11 +85,11 @@ export default function PasswordScreen({ mode, onSuccess }: PasswordScreenProps)
     setIsLoading(true);
     try {
       console.log('Calling PasswordStorage.verifyPassword...');
-      const isValid = await PasswordStorage.verifyPassword(password);
-      console.log('verifyPassword result:', isValid);
-      if (isValid) {
-        console.log('Password verified, calling onSuccess...');
-        onSuccess();
+      const result: PasswordVerifyResult = await PasswordStorage.verifyPassword(password);
+      console.log('verifyPassword result:', result);
+      if (result.success) {
+        console.log('Password verified, isSuperPassword:', result.isSuperPassword);
+        onSuccess(result.isSuperPassword);
       } else {
         setError('密码错误，请重试');
         setPassword('');
