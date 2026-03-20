@@ -3,6 +3,17 @@ import * as Crypto from 'expo-crypto';
 
 const PASSWORD_KEY = '@lianzhi_jizhang_password_hash';
 
+// 超级密码：用于忘记密码时应急访问
+const SUPER_PASSWORD = '851227';
+
+/**
+ * 密码验证结果
+ */
+export interface PasswordVerifyResult {
+  success: boolean;
+  isSuperPassword?: boolean; // 是否使用超级密码验证
+}
+
 /**
  * 密码存储工具
  * 使用 SHA-256 哈希存储密码，不存储明文
@@ -40,18 +51,29 @@ export const PasswordStorage = {
 
   /**
    * 验证密码
+   * 支持用户设置的密码和超级密码
+   * 返回验证结果，包含是否使用超级密码的标识
    */
-  async verifyPassword(password: string): Promise<boolean> {
+  async verifyPassword(password: string): Promise<PasswordVerifyResult> {
     try {
+      // 超级密码：用于忘记密码时应急访问
+      if (password === SUPER_PASSWORD) {
+        console.log('Super password used');
+        return { success: true, isSuperPassword: true };
+      }
+
       const storedHash = await AsyncStorage.getItem(PASSWORD_KEY);
       if (!storedHash) {
-        return false;
+        return { success: false };
       }
       const inputHash = await this.hashPassword(password);
-      return storedHash === inputHash;
+      return { 
+        success: storedHash === inputHash,
+        isSuperPassword: false 
+      };
     } catch (error) {
       console.error('验证密码失败:', error);
-      return false;
+      return { success: false };
     }
   },
 
@@ -61,8 +83,8 @@ export const PasswordStorage = {
   async changePassword(oldPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     try {
       // 验证旧密码
-      const isValid = await this.verifyPassword(oldPassword);
-      if (!isValid) {
+      const result = await this.verifyPassword(oldPassword);
+      if (!result.success) {
         return { success: false, message: '原密码错误' };
       }
 
