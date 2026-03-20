@@ -30,51 +30,42 @@ export default function StatsScreen() {
   const [deliveryRecordProjectId, setDeliveryRecordProjectId] = useState<string | null>(null);
   const [deliveryRecordSelectorVisible, setDeliveryRecordSelectorVisible] = useState(false);
 
-const loadData = useCallback(async () => {
-  const projectData = await ProjectStorage.getAll();
-  const transactionData = await TransactionStorage.getAll();
-  const deliveryRecordsData = await DeliveryRecordStorage.getAll();
+  const loadData = useCallback(async () => {
+    const projectData = await ProjectStorage.getAll();
+    const transactionData = await TransactionStorage.getAll();
+    const deliveryRecordsData = await DeliveryRecordStorage.getAll();
 
-  console.log('[DEBUG] loadData - deliveryRecordsData:', deliveryRecordsData.length);
-  if (deliveryRecordsData.length > 0) {
-    console.log('[DEBUG] First delivery record:', JSON.stringify(deliveryRecordsData[0], null, 2));
-  }
+    const statsMap = new Map<string, { totalIncome: number; totalExpense: number; netProfit: number }>();
 
-  const statsMap = new Map<string, { totalIncome: number; totalExpense: number; netProfit: number }>();
+    for (const project of projectData) {
+      const stats = await calculateProjectStats(project);
+      statsMap.set(project.id, {
+        totalIncome: stats.totalIncome,
+        totalExpense: stats.totalExpense,
+        netProfit: stats.netProfit,
+      });
+    }
 
-  for (const project of projectData) {
-    const stats = await calculateProjectStats(project);
-    statsMap.set(project.id, {
-      totalIncome: stats.totalIncome,
-      totalExpense: stats.totalExpense,
-      netProfit: stats.netProfit,
-    });
-  }
+    setProjects(projectData);
+    setTransactions(transactionData);
+    setDeliveryRecords(deliveryRecordsData);
+    setProjectStats(statsMap);
+  }, []);
 
-  setProjects(projectData);
-  setTransactions(transactionData);
-  setDeliveryRecords(deliveryRecordsData);
-  setProjectStats(statsMap);
-}, []);
+  const getDeliveryTotalAmount = useCallback((projectId: string) => {
+    const records = deliveryRecords.filter(r => r.projectId === projectId);
+    return records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  }, [deliveryRecords]);
 
+  const getDeliveryInvoicedAmount = useCallback((projectId: string) => {
+    const records = deliveryRecords.filter(r => r.projectId === projectId);
+    return records.reduce((sum, r) => sum + (Number(r.invoiceAmount) || 0), 0);
+  }, [deliveryRecords]);
 
- const getDeliveryTotalAmount = useCallback((projectId: string) => {
-  const records = deliveryRecords.filter(r => r.projectId === projectId);
-  return records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-}, [deliveryRecords]);
-
-const getDeliveryInvoicedAmount = useCallback((projectId: string) => {
-  const records = deliveryRecords.filter(r => r.projectId === projectId);
-  return records.reduce((sum, r) => sum + (Number(r.invoiceAmount) || 0), 0);
-}, [deliveryRecords]);
-
-const getDeliveryReceivedAmount = useCallback((projectId: string) => {
-  const records = deliveryRecords.filter(r => r.projectId === projectId);
-  const total = records.reduce((sum, r) => sum + (Number(r.receivedAmount) || 0), 0);
-  console.log(`[DEBUG] getDeliveryReceivedAmount for project ${projectId}:`, total, 'records:', records.length);
-  return total;
-}, [deliveryRecords]);
-
+  const getDeliveryReceivedAmount = useCallback((projectId: string) => {
+    const records = deliveryRecords.filter(r => r.projectId === projectId);
+    return records.reduce((sum, r) => sum + (Number(r.receivedAmount) || 0), 0);
+  }, [deliveryRecords]);
 
   useFocusEffect(
     useCallback(() => {
@@ -179,7 +170,10 @@ const getDeliveryReceivedAmount = useCallback((projectId: string) => {
         totalAmount = project.settlementAmount || project.contractAmount || 0;
       }
 
-      const netProfit = stats.netProfit;
+      // 零星采购使用送货记录的收款金额计算利润
+      const netProfit = project.projectType === 'delivery' 
+        ? getDeliveryReceivedAmount(project.id) - stats.totalExpense 
+        : stats.netProfit;
       const profitRate = totalAmount > 0 ? (netProfit / totalAmount) * 100 : 0;
 
       items.push({
@@ -196,7 +190,7 @@ const getDeliveryReceivedAmount = useCallback((projectId: string) => {
 
     // 按净利润降序排序
     return items.sort((a, b) => b.netProfit - a.netProfit);
-  }, [projects, projectStats, getDeliveryTotalAmount]);
+  }, [projects, projectStats, getDeliveryTotalAmount, getDeliveryReceivedAmount]);
 
   // 原有的送货开票收款汇总
   const deliveryInvoicePaymentSummary = useMemo(() => {
@@ -255,19 +249,11 @@ const getDeliveryReceivedAmount = useCallback((projectId: string) => {
     return { contractCount, deliveryCount };
   }, [projects]);
 
- const deliveryStatsProjects = filteredProjects.filter(p => p.projectType === 'delivery');
-const deliveryTotalAmountVal = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryTotalAmount(p.id), 0);
-const deliveryTotalInvoiced = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryInvoicedAmount(p.id), 0);
-const deliveryTotalIncome = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryReceivedAmount(p.id), 0);
-const deliveryTotalUnpaid = deliveryTotalAmountVal - deliveryTotalIncome;
-
-// 添加调试日志
-console.log('[DEBUG] deliveryStatsProjects count:', deliveryStatsProjects.length);
-console.log('[DEBUG] deliveryTotalAmountVal:', deliveryTotalAmountVal);
-console.log('[DEBUG] deliveryTotalIncome:', deliveryTotalIncome);
-console.log('[DEBUG] deliveryTotalUnpaid:', deliveryTotalUnpaid);
-console.log('[DEBUG] deliveryRecords count:', deliveryRecords.length);
-
+  const deliveryStatsProjects = filteredProjects.filter(p => p.projectType === 'delivery');
+  const deliveryTotalAmountVal = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryTotalAmount(p.id), 0);
+  const deliveryTotalInvoiced = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryInvoicedAmount(p.id), 0);
+  const deliveryTotalIncome = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryReceivedAmount(p.id), 0);
+  const deliveryTotalUnpaid = deliveryTotalAmountVal - deliveryTotalIncome;
 
   const totalIncome = contractTotalIncome + deliveryTotalIncome;
   const totalExpense = Array.from(projectStats.entries())
