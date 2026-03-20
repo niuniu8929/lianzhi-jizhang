@@ -52,20 +52,23 @@ export default function StatsScreen() {
     setProjectStats(statsMap);
   }, []);
 
-  const getDeliveryTotalAmount = useCallback((projectId: string) => {
-    const records = deliveryRecords.filter(r => r.projectId === projectId);
-    return records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  }, [deliveryRecords]);
+ const getDeliveryTotalAmount = useCallback((projectId: string) => {
+  const records = deliveryRecords.filter(r => r.projectId === projectId);
+  return records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+}, [deliveryRecords]);
 
-  const getDeliveryInvoicedAmount = useCallback((projectId: string) => {
-    const records = deliveryRecords.filter(r => r.projectId === projectId);
-    return records.reduce((sum, r) => sum + (Number(r.invoiceAmount) || 0), 0);
-  }, [deliveryRecords]);
+const getDeliveryInvoicedAmount = useCallback((projectId: string) => {
+  const records = deliveryRecords.filter(r => r.projectId === projectId);
+  return records.reduce((sum, r) => sum + (Number(r.invoiceAmount) || 0), 0);
+}, [deliveryRecords]);
 
-  const getDeliveryReceivedAmount = useCallback((projectId: string) => {
-    const records = deliveryRecords.filter(r => r.projectId === projectId);
-    return records.reduce((sum, r) => sum + (Number(r.receivedAmount) || 0), 0);
-  }, [deliveryRecords]);
+const getDeliveryReceivedAmount = useCallback((projectId: string) => {
+  const records = deliveryRecords.filter(r => r.projectId === projectId);
+  const total = records.reduce((sum, r) => sum + (Number(r.receivedAmount) || 0), 0);
+  console.log(`[DEBUG] getDeliveryReceivedAmount for project ${projectId}:`, total, 'records:', records.length);
+  return total;
+}, [deliveryRecords]);
+
 
   useFocusEffect(
     useCallback(() => {
@@ -246,11 +249,19 @@ export default function StatsScreen() {
     return { contractCount, deliveryCount };
   }, [projects]);
 
-  const deliveryStatsProjects = filteredProjects.filter(p => p.projectType === 'delivery');
-  const deliveryTotalAmountVal = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryTotalAmount(p.id), 0);
-  const deliveryTotalInvoiced = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryInvoicedAmount(p.id), 0);
-  const deliveryTotalIncome = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryReceivedAmount(p.id), 0);
-  const deliveryTotalUnpaid = deliveryTotalAmountVal - deliveryTotalIncome;
+ const deliveryStatsProjects = filteredProjects.filter(p => p.projectType === 'delivery');
+const deliveryTotalAmountVal = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryTotalAmount(p.id), 0);
+const deliveryTotalInvoiced = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryInvoicedAmount(p.id), 0);
+const deliveryTotalIncome = deliveryStatsProjects.reduce((sum, p) => sum + getDeliveryReceivedAmount(p.id), 0);
+const deliveryTotalUnpaid = deliveryTotalAmountVal - deliveryTotalIncome;
+
+// 添加调试日志
+console.log('[DEBUG] deliveryStatsProjects count:', deliveryStatsProjects.length);
+console.log('[DEBUG] deliveryTotalAmountVal:', deliveryTotalAmountVal);
+console.log('[DEBUG] deliveryTotalIncome:', deliveryTotalIncome);
+console.log('[DEBUG] deliveryTotalUnpaid:', deliveryTotalUnpaid);
+console.log('[DEBUG] deliveryRecords count:', deliveryRecords.length);
+
 
   const totalIncome = contractTotalIncome + deliveryTotalIncome;
   const totalExpense = Array.from(projectStats.entries())
