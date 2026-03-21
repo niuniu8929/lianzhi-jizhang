@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useMemo, memo } from 'react';
-import { View, TouchableOpacity, Alert, FlatList, ListRenderItem, ScrollView } from 'react-native';
+import { View, TouchableOpacity, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
-import { Project, DeliveryRecord, InvoiceStatusNames, ProjectStatus } from '@/types';
+import { Project, DeliveryRecord, InvoiceStatusNames } from '@/types';
 import { ProjectStorage, TransactionStorage, DeliveryRecordStorage } from '@/utils/storage';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { Screen } from '@/components/Screen';
@@ -204,63 +204,6 @@ export default function ProjectDetailScreen() {
     invoiceAmount: deliveryInvoiceAmount,
     recordCount: deliveryRecords.length,
   }), [deliveryTotalAmount, deliveryReceivedAmount, deliveryInvoiceAmount, deliveryRecords.length]);
-
-  // 判断是否可以结账
-  const canSettle = isDelivery && 
-    project?.status !== 'completed' && 
-    deliveryTotalAmount > 0 && 
-    deliveryReceivedAmount >= deliveryTotalAmount;
-
-  // ============================================
-  // 零星采购结账处理
-  // ============================================
-  const handleSettleProject = useCallback(() => {
-    if (!project || !isDelivery) return;
-
-    if (deliveryReceivedAmount < deliveryTotalAmount) {
-      Alert.alert('无法结账', `收款金额（¥${deliveryReceivedAmount.toLocaleString()}）未达到送货总额（¥${deliveryTotalAmount.toLocaleString()}）`);
-      return;
-    }
-
-    Alert.alert(
-      '确认结账',
-      '结账后项目将标记为已完成，不再显示在项目列表中。确定要结账吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确定结账',
-          style: 'default',
-          onPress: async () => {
-            const updatedProject: Project = {
-              ...project,
-              status: 'completed' as ProjectStatus,
-              updatedAt: new Date().toISOString(),
-            };
-            const success = await ProjectStorage.save(updatedProject);
-            if (success) {
-              Alert.alert('结账成功', '项目已结账，可在统计页面查看', [
-                { text: '确定', onPress: () => router.back() }
-              ]);
-            } else {
-              Alert.alert('错误', '结账失败，请重试');
-            }
-          }
-        }
-      ]
-    );
-  }, [project, isDelivery, deliveryReceivedAmount, deliveryTotalAmount, router]);
-
-  // 渲染送货记录项
-  const renderDeliveryItem: ListRenderItem<DeliveryRecord> = useCallback(({ item, index }) => (
-    <DeliveryCard 
-      record={item} 
-      index={index} 
-      totalCount={deliveryRecords.length}
-    />
-  ), [deliveryRecords.length]);
-
-  // 提取 key
-  const keyExtractor = useCallback((item: DeliveryRecord) => item.id, []);
 
   // ============================================
   // 加载状态
@@ -560,47 +503,6 @@ export default function ProjectDetailScreen() {
                 暂无送货记录
               </ThemedText>
             </ThemedView>
-          )}
-
-          {/* 零星采购结账按钮 */}
-          {isDelivery && project.status !== 'completed' && (
-            <View style={{ marginTop: Spacing.lg, marginHorizontal: Spacing.lg, marginBottom: Spacing.xl }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: canSettle ? theme.success : theme.backgroundTertiary,
-                  paddingVertical: Spacing.lg,
-                  paddingHorizontal: Spacing.xl,
-                  borderRadius: BorderRadius.lg,
-                  alignItems: 'center',
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                }}
-                onPress={handleSettleProject}
-                disabled={!canSettle}
-                activeOpacity={0.7}
-              >
-                <FontAwesome6
-                  name="circle-check"
-                  size={20}
-                  color={canSettle ? '#FFFFFF' : theme.textMuted}
-                  style={{ marginRight: Spacing.sm }}
-                />
-                <ThemedText
-                  variant="body"
-                  color={canSettle ? '#FFFFFF' : theme.textMuted}
-                  style={{ fontWeight: '600' }}
-                >
-                  {canSettle 
-                    ? '确认结账' 
-                    : `未收款 ¥${(deliveryTotalAmount - deliveryReceivedAmount).toLocaleString()}，无法结账`}
-                </ThemedText>
-              </TouchableOpacity>
-              {!canSettle && deliveryTotalAmount > 0 && (
-                <ThemedText variant="caption" color={theme.textMuted} style={{ textAlign: 'center', marginTop: Spacing.sm }}>
-                  收款金额达到送货总额后可结账
-                </ThemedText>
-              )}
-            </View>
           )}
         </ScrollView>
       </ThemedView>
