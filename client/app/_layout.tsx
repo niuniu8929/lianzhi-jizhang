@@ -1,19 +1,10 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
-import { checkAndAutoBackup } from '@/services/LocalStorage';
 
 export default function RootLayout() {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-
-  // 应用启动时检查并执行自动备份
-  useEffect(() => {
-    checkAndAutoBackup().catch(() => {
-      // 自动备份失败，静默处理
-    });
-  }, []);
 
   return (
     <Stack

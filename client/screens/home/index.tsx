@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -23,6 +23,7 @@ import {
   workerService,
   workLogService,
   templateService,
+  checkAndAutoBackup,
   type WorkTemplate,
 } from '@/services/LocalStorage';
 
@@ -49,6 +50,7 @@ interface WorkLog {
 export default function HomeScreen() {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const backupCalledRef = useRef(false);
 
   // 表单状态
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
@@ -99,6 +101,14 @@ export default function HomeScreen() {
       setWorkers(workerData);
       setWorkLogs(workLogData);
       setTemplates(templateData);
+
+      // 首次加载后执行自动备份（不阻塞UI）
+      if (!backupCalledRef.current) {
+        backupCalledRef.current = true;
+        checkAndAutoBackup().catch(() => {
+          // 自动备份失败，静默处理
+        });
+      }
     } catch (error) {
       console.error('加载数据失败:', error);
       Alert.alert('错误', '加载数据失败');
