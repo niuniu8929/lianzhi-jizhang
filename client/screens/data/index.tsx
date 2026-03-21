@@ -1066,7 +1066,7 @@ export default function DataScreen() {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <TouchableOpacity
+          <View
             style={{
               flex: 1,
               backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1074,8 +1074,6 @@ export default function DataScreen() {
               alignItems: 'center',
               padding: Spacing.lg,
             }}
-            activeOpacity={1}
-            onPress={() => setClearPasswordModalVisible(false)}
           >
             <View style={{
               backgroundColor: theme.backgroundDefault,
@@ -1083,9 +1081,7 @@ export default function DataScreen() {
               padding: Spacing.xl,
               width: '100%',
               maxWidth: 400,
-            }}
-            onStartShouldSetResponder={() => true}
-            >
+            }}>
               {/* 标题 */}
               <View style={{
                 flexDirection: 'row',
@@ -1197,7 +1193,7 @@ export default function DataScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </Screen>
