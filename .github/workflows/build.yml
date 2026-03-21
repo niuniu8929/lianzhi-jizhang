@@ -30,9 +30,11 @@ jobs:
           npm install
 
       - name: Generate native project
+        env:
+          CI: 1
         run: |
           cd client
-          npx expo prebuild --platform android --yes
+          npx expo prebuild --platform android --clean
 
       - name: Build APK (Debug)
         run: |
