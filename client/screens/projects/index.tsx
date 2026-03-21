@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, FlatList, TouchableOpacity, Image, ScrollView, Modal } from 'react-native';
+import { View, FlatList, TouchableOpacity, Image, ScrollView, Modal, Alert } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
-import { Project, DeliveryRecord } from '@/types';
+import { Project, DeliveryRecord, ProjectStatus } from '@/types';
 import { ProjectStorage, DeliveryRecordStorage } from '@/utils/storage';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { Screen } from '@/components/Screen';
@@ -407,13 +407,53 @@ export default function ProjectsScreen() {
             )}
 
             {/* 添加送货记录按钮 */}
-            <TouchableOpacity 
-              style={[styles.quickAddButton, { backgroundColor: theme.accent + '15', borderColor: theme.accent + '30' }]}
-              onPress={() => router.push('/delivery-add', { projectId: item.id })}
-            >
-              <FontAwesome6 name="plus" size={14} color={theme.accent} style={{ marginRight: 6 }} />
-              <ThemedText variant="caption" color={theme.accent}>添加送货记录</ThemedText>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: Spacing.sm }}>
+              <TouchableOpacity 
+                style={[styles.quickAddButton, { flex: 1, backgroundColor: theme.accent + '15', borderColor: theme.accent + '30' }]}
+                onPress={() => router.push('/delivery-add', { projectId: item.id })}
+              >
+                <FontAwesome6 name="plus" size={14} color={theme.accent} style={{ marginRight: 6 }} />
+                <ThemedText variant="caption" color={theme.accent}>添加送货</ThemedText>
+              </TouchableOpacity>
+              
+              {/* 结账按钮 */}
+              {totalDeliveryAmount > 0 && totalReceivedAmount >= totalDeliveryAmount && (
+                <TouchableOpacity 
+                  style={[styles.quickAddButton, { flex: 1, backgroundColor: theme.success + '15', borderColor: theme.success + '30' }]}
+                  onPress={async () => {
+                    Alert.alert(
+                      '确认结账',
+                      `项目「${item.name}」\n送货总额: ¥${totalDeliveryAmount.toLocaleString()}\n已收款: ¥${totalReceivedAmount.toLocaleString()}\n\n结账后项目将标记为已完成，确定要结账吗？`,
+                      [
+                        { text: '取消', style: 'cancel' },
+                        {
+                          text: '确定结账',
+                          style: 'default',
+                          onPress: async () => {
+                            const updatedProject: Project = {
+                              ...item,
+                              status: 'completed' as ProjectStatus,
+                              updatedAt: new Date().toISOString(),
+                            };
+                            const success = await ProjectStorage.save(updatedProject);
+                            if (success) {
+                              Alert.alert('结账成功', '项目已结账，可在统计页面查看', [
+                                { text: '确定', onPress: () => loadProjects() }
+                              ]);
+                            } else {
+                              Alert.alert('错误', '结账失败，请重试');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <FontAwesome6 name="circle-check" size={14} color={theme.success} style={{ marginRight: 6 }} />
+                  <ThemedText variant="caption" color={theme.success}>确认结账</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
           </>
         ) : (
           /* 合同项目 - 简洁显示 */
