@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, Share, Platform, Text, Button, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Share, Platform, Text, Button, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -15,6 +15,9 @@ import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, BorderRadius, Theme } from '@/constants/theme';
 import { Project, PaymentRecord, InvoiceRecord, DeliveryRecord } from '@/types';
+
+// 清除已完成项目的验证密码
+const CLEAR_PASSWORD = '123456';
 
 const PROJECTS_KEY = '@project_accounting_projects';
 const TRANSACTIONS_KEY = '@project_accounting_transactions';
@@ -195,6 +198,11 @@ export default function DataScreen() {
 
   // 修改密码弹窗
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+
+  // 清除数据密码验证弹窗
+  const [clearPasswordModalVisible, setClearPasswordModalVisible] = useState(false);
+  const [clearPasswordInput, setClearPasswordInput] = useState('');
+  const [clearPasswordError, setClearPasswordError] = useState('');
 
   // 项目记录相关状态
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -488,6 +496,24 @@ export default function DataScreen() {
   };
 
   const handleClearCompletedProjects = async () => {
+    // 先弹出密码验证弹窗
+    setClearPasswordInput('');
+    setClearPasswordError('');
+    setClearPasswordModalVisible(true);
+  };
+
+  // 验证密码并执行清除操作
+  const handleConfirmClearWithPassword = useCallback(async () => {
+    if (clearPasswordInput !== CLEAR_PASSWORD) {
+      setClearPasswordError('密码错误，请重新输入');
+      return;
+    }
+
+    // 密码正确，关闭弹窗并执行清除
+    setClearPasswordModalVisible(false);
+    setClearPasswordInput('');
+    setClearPasswordError('');
+
     try {
       // 获取所有项目
       const allProjects = await ProjectStorage.getAll();
@@ -537,13 +563,16 @@ export default function DataScreen() {
         `已清除 ${completedProjects.length} 个已完成项目\n- 支出记录: ${allTransactions.length - transactionsToKeep.length} 条\n- 送货记录: ${deletedDeliveryCount} 条`,
         [{ text: '确定', style: 'default' }]
       );
+
+      // 刷新数据
+      loadProjects();
     } catch (error) {
       console.error('清除已完成项目失败:', error);
       showCustomAlert('清除失败', '请重试', [
         { text: '确定', style: 'default' }
       ]);
     }
-  };
+  }, [clearPasswordInput, showCustomAlert, loadProjects]);
 
   return (
     <Screen backgroundColor={theme.backgroundRoot} statusBarStyle={isDark ? 'light' : 'dark'}>
@@ -1025,6 +1054,152 @@ export default function DataScreen() {
         visible={passwordModalVisible}
         onClose={() => setPasswordModalVisible(false)}
       />
+
+      {/* 清除数据密码验证弹窗 */}
+      <Modal
+        visible={clearPasswordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setClearPasswordModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: Spacing.lg,
+            }}
+            activeOpacity={1}
+            onPress={() => setClearPasswordModalVisible(false)}
+          >
+            <View style={{
+              backgroundColor: theme.backgroundDefault,
+              borderRadius: BorderRadius.xl,
+              padding: Spacing.xl,
+              width: '100%',
+              maxWidth: 400,
+            }}
+            onStartShouldSetResponder={() => true}
+            >
+              {/* 标题 */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: Spacing.lg,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: theme.error + '20',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: Spacing.md,
+                  }}>
+                    <FontAwesome6 name="shield-halved" size={20} color={theme.error} />
+                  </View>
+                  <ThemedText variant="h3" color={theme.textPrimary}>
+                    安全验证
+                  </ThemedText>
+                </View>
+                <TouchableOpacity onPress={() => setClearPasswordModalVisible(false)} style={{ padding: Spacing.sm }}>
+                  <FontAwesome6 name="xmark" size={20} color={theme.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ThemedText variant="body" color={theme.textSecondary} style={{ marginBottom: Spacing.lg }}>
+                清除已完成项目是危险操作，请输入密码确认
+              </ThemedText>
+
+              {/* 密码输入 */}
+              <View style={{ marginBottom: Spacing.lg }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: theme.backgroundTertiary,
+                  borderRadius: BorderRadius.md,
+                  paddingHorizontal: Spacing.lg,
+                  height: 52,
+                  borderWidth: 1,
+                  borderColor: clearPasswordError ? theme.error : 'transparent',
+                }}>
+                  <FontAwesome6 name="lock" size={18} color={theme.textMuted} style={{ marginRight: Spacing.md }} />
+                  <TextInput
+                    style={{ flex: 1, color: theme.textPrimary, fontSize: 16 }}
+                    placeholder="请输入密码"
+                    placeholderTextColor={theme.textMuted}
+                    value={clearPasswordInput}
+                    onChangeText={(text) => {
+                      setClearPasswordInput(text);
+                      setClearPasswordError('');
+                    }}
+                    secureTextEntry
+                    maxLength={20}
+                    returnKeyType="done"
+                    onSubmitEditing={handleConfirmClearWithPassword}
+                  />
+                </View>
+              </View>
+
+              {/* 错误提示 */}
+              {clearPasswordError ? (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: Spacing.md,
+                  paddingHorizontal: Spacing.sm,
+                }}>
+                  <FontAwesome6 name="circle-exclamation" size={14} color={theme.error} />
+                  <ThemedText variant="body" color={theme.error} style={{ marginLeft: Spacing.sm }}>
+                    {clearPasswordError}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {/* 按钮 */}
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: BorderRadius.md,
+                    backgroundColor: theme.backgroundTertiary,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => {
+                    setClearPasswordModalVisible(false);
+                    setClearPasswordInput('');
+                    setClearPasswordError('');
+                  }}
+                >
+                  <ThemedText variant="body" color={theme.textSecondary}>取消</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: BorderRadius.md,
+                    backgroundColor: theme.error,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={handleConfirmClearWithPassword}
+                >
+                  <ThemedText variant="body" color="#FFFFFF">确认清除</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </Screen>
   );
 }
