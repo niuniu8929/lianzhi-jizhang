@@ -14,6 +14,15 @@ import { Spacing, BorderRadius } from '@/constants/theme';
 import { createStyles } from './styles';
 import { ProjectStatusNames, ProjectTypeNames, InvoiceStatusNames } from '@/types';
 
+// 计算倒计时（距离竣工日期还有多少天）
+function calculateCountdown(endDate: string) {
+  const end = new Date(endDate);
+  const now = new Date();
+  const diffTime = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
 // 送货记录卡片组件
 const DeliveryRecordItem = ({ 
   record, 
@@ -281,6 +290,9 @@ export default function ProjectsScreen() {
     const totalInvoicedAmount = getDeliveryInvoicedAmount(item.id);
     const totalReceivedAmount = getDeliveryReceivedAmount(item.id);
     
+    // 计算倒计时
+    const countdown = item.endDate ? calculateCountdown(item.endDate) : null;
+    
     return (
       <View style={styles.projectCard}>
         {/* 项目头部 */}
@@ -420,9 +432,22 @@ export default function ProjectsScreen() {
                 </View>
                 <View style={styles.infoItem}>
                   <ThemedText variant="caption" color={theme.textMuted}>工程竣工日期</ThemedText>
-                  <ThemedText variant="body" color={item.endDate && isOverdue(item.endDate) ? theme.error : theme.textPrimary} style={styles.infoValue}>
-                    {item.endDate ? formatDate(item.endDate) : '-'}
-                  </ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ThemedText variant="body" color={item.endDate && new Date(item.endDate) < new Date() ? theme.error : theme.textPrimary} style={styles.infoValue}>
+                      {item.endDate ? formatDate(item.endDate) : '-'}
+                    </ThemedText>
+                    {item.endDate && (
+                      <ThemedText variant="caption" color={countdown !== null && countdown < 0 ? theme.error : (countdown !== null && countdown <= 7 ? theme.accent : theme.success)} style={{ marginLeft: 6 }}>
+                        {countdown !== null && (
+                          countdown < 0 
+                            ? `(超期 ${Math.abs(countdown)} 天)` 
+                            : countdown === 0 
+                              ? '(今天)' 
+                              : `(倒计时 ${countdown} 天)`
+                        )}
+                      </ThemedText>
+                    )}
+                  </View>
                 </View>
               </View>
             </View>
@@ -439,10 +464,6 @@ export default function ProjectsScreen() {
       case 'paused': return theme.textMuted;
       default: return theme.textMuted;
     }
-  };
-
-  const isOverdue = (endDate: string) => {
-    return new Date(endDate) < new Date();
   };
 
   const renderEmpty = () => (
