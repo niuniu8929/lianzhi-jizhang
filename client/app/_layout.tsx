@@ -1,9 +1,16 @@
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
+import { ColorSchemeProvider } from '@/hooks/useColorScheme';
+import * as SplashScreen from 'expo-splash-screen';
+import { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
 
-export default function RootLayout() {
-  const { theme, isDark } = useTheme();
+// 防止自动隐藏 splash screen
+SplashScreen.preventAutoHideAsync();
+
+function RootNavigation() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -21,5 +28,44 @@ export default function RootLayout() {
       <Stack.Screen name="project-detail" />
       <Stack.Screen name="+not-found" />
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (e) {
+        console.warn('Prepare error:', e);
+      } finally {
+        setIsReady(true);
+      }
+    }
+    prepare();
+  }, []);
+
+  const onLayoutRootView = useCallback(async () => {
+    if (isReady) {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn('Hide splash error:', e);
+      }
+    }
+  }, [isReady]);
+
+  if (!isReady) {
+    return null;
+  }
+
+  return (
+    <ColorSchemeProvider>
+      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        <RootNavigation />
+      </View>
+    </ColorSchemeProvider>
   );
 }
