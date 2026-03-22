@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "icon": "./assets/images/icon.png",
     "scheme": "lianzhi-jigong",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.workhours.app"
@@ -25,6 +25,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "backgroundColor": "#ffffff"
       },
       "package": "com.workhours.app"
+    },
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
     },
     "web": {
       "bundler": "metro",
@@ -41,9 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
