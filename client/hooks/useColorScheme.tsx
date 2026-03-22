@@ -29,7 +29,7 @@ const ColorSchemeProvider = function ({ children }: { children?: ReactNode }) {
       if (Platform.OS === 'web') {
         window.removeEventListener('message', handleMessage, false);
       }
-    }
+    };
   }, [setColorScheme]);
 
   return <ColorSchemeContext.Provider value={colorScheme}>
