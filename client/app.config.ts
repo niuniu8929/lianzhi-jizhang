@@ -42,12 +42,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         }
       ] : 'expo-router',
       [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#ffffff"
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "允许联智计工App访问您的相册，以便您上传或保存图片。",
