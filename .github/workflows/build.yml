@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd client
-          pnpm install --frozen-lockfile || pnpm install
+          pnpm install --no-frozen-lockfile
 
       - name: Generate native project
         env:
@@ -78,8 +78,6 @@ jobs:
           EOF
 
       - name: Build APK (Release)
-        env:
-          NODE_BINARY: $(which node)
         run: |
           cd client/android
           chmod +x gradlew
