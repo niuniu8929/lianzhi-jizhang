@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "icon": "./assets/images/icon.png",
     "scheme": "lianzhi-jigong",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,  // 改为 false
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.workhours.app"
@@ -52,22 +52,22 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-image-picker",
         {
-          "photosPermission": `允许联智计工App访问您的相册，以便您上传或保存图片。`,
-          "cameraPermission": `允许联智计工App使用您的相机，以便您直接拍摄照片上传。`,
-          "microphonePermission": `允许联智计工App访问您的麦克风，以便您拍摄带有声音的视频。`
+          "photosPermission": "允许联智计工App访问您的相册，以便您上传或保存图片。",
+          "cameraPermission": "允许联智计工App使用您的相机，以便您直接拍摄照片上传。",
+          "microphonePermission": "允许联智计工App访问您的麦克风，以便您拍摄带有声音的视频。"
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": `联智计工App需要访问您的位置以提供周边服务及导航功能。`
+          "locationWhenInUsePermission": "联智计工App需要访问您的位置以提供周边服务及导航功能。"
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": `联智计工App需要访问相机以拍摄照片和视频。`,
-          "microphonePermission": `联智计工App需要访问麦克风以录制视频声音。`,
+          "cameraPermission": "联智计工App需要访问相机以拍摄照片和视频。",
+          "microphonePermission": "联智计工App需要访问麦克风以录制视频声音。",
           "recordAudioAndroid": true
         }
       ],
