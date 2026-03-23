@@ -78,6 +78,8 @@ jobs:
           EOF
 
       - name: Build APK (Release)
+        env:
+          NODE_BINARY: $(which node)
         run: |
           cd client/android
           chmod +x gradlew
