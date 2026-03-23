@@ -13,6 +13,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -25,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd client
-          npm install
+          pnpm install --frozen-lockfile || pnpm install
 
       - name: Generate native project
         env:
@@ -34,14 +39,54 @@ jobs:
           cd client
           npx expo prebuild --platform android --clean
 
-      - name: Build APK (Debug)
+      - name: Configure release signing
+        run: |
+          cd client/android
+          # 使用 Python 修改 build.gradle 添加 release 签名配置
+          python3 << 'EOF'
+          import re
+          
+          gradle_path = 'app/build.gradle'
+          with open(gradle_path, 'r') as f:
+              content = f.read()
+          
+          # 添加 signingConfigs（如果不存在）
+          signing_config = '''
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv("ANDROID_SDK_ROOT") + "/debug.keystore")
+                      storePassword "android"
+                      keyAlias "androiddebugkey"
+                      keyPassword "android"
+                  }
+              }
+          '''
+          
+          # 在 android {} 块内添加 signingConfigs
+          if 'signingConfigs' not in content:
+              content = content.replace('android {', 'android {' + signing_config)
+          
+          # 在 release buildType 中添加 signingConfig
+          content = re.sub(
+              r'(buildTypes\s*\{\s*release\s*\{)',
+              r'\1\n            signingConfig signingConfigs.release',
+              content
+          )
+          
+          with open(gradle_path, 'w') as f:
+              f.write(content)
+          
+          print("Signing configuration added successfully")
+          EOF
+
+      - name: Build APK (Release)
         run: |
           cd client/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: client/android/app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: client/android/app/build/outputs/apk/release/app-release.apk
