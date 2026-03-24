@@ -87,6 +87,7 @@ export default function HomeScreen() {
   const [editWorkers, setEditWorkers] = useState<Map<number, number>>(new Map());
   const [editDate, setEditDate] = useState<Date>(new Date());
   const [editDescription, setEditDescription] = useState('');
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
 
   // 加载数据
   const fetchData = useCallback(async () => {
@@ -724,6 +725,17 @@ export default function HomeScreen() {
           }}
         />
       )}
+      {showEditDatePicker && (
+        <DateTimePicker
+          value={editDate}
+          mode="date"
+          display="default"
+          onChange={(event, date) => {
+            setShowEditDatePicker(false);
+            if (date) setEditDate(date);
+          }}
+        />
+      )}
 
       {/* 项目选择 Modal */}
       <Modal visible={showProjectModal} transparent animationType="fade">
@@ -942,7 +954,7 @@ export default function HomeScreen() {
                 </ThemedText>
                 <TouchableOpacity
                   style={styles.dateSelector}
-                  onPress={() => setShowDatePicker(true)}
+                  onPress={() => setShowEditDatePicker(true)}
                 >
                   <FontAwesome6 name="calendar" size={20} color={theme.textPrimary} />
                   <ThemedText variant="body" color={theme.textPrimary}>
