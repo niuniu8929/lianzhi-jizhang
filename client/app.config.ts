@@ -27,7 +27,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "package": "com.workhours.app"
     },
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
